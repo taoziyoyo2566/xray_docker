@@ -66,7 +66,7 @@ else
   if [ -z "$REGION" ]; then
     echo "region not set"
   else
-    URL_ID=$REGION_$URL_ID
+    URL_ID=$(REGION)_$(URL_ID)
   fi
 
   # change config
