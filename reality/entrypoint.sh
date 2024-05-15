@@ -49,6 +49,14 @@ else
     URL_ID=$(openssl rand -hex 4 | tr -d '\n')
   fi
   
+   if [ -z "$REGION" ]; then
+    REGION_ID=$URL_ID
+    REGION="NA"
+    echo "region not set"
+  else
+    REGION_ID=$(REGION)_$(URL_ID)
+  fi
+
   CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
   EXPIRE_DATETIME=NA
   if [ -z "$DAY_COUNT" ]; then
@@ -61,12 +69,6 @@ else
     echo "month not set"
   else 
     EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
-  fi
-
-  if [ -z "$REGION" ]; then
-    echo "region not set"
-  else
-    URL_ID=$(REGION)_$(URL_ID)
   fi
 
   # change config
@@ -96,7 +98,7 @@ else
   echo "NETWORK: $NETWORK" >>/config_info.txt
   if [ "$IPV4" != "null" ]; then
     SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality"
-    URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$URL_ID"
+    URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
     echo "IPV4 订阅连接: $SUB_IPV4" >>/config_info.txt
     echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info.json <<EOF
@@ -116,7 +118,7 @@ EOF
   fi
   if [ "$IPV6" != "null" ];then
     SUB_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality_vision_V6"
-    URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$URL_ID"
+    URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$REGION_ID"
     echo "IPV6 订阅连接: $SUB_IPV6" >>/config_info.txt
     #echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info_v6.json <<EOF
