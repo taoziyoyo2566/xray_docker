@@ -3,15 +3,16 @@ xray reality docker 镜像
 
 tar zxf ~/reality_stage.tar.gz -C /opt/docker/
 
+docker build -t vless_reality:v1 .
 DAY_COUNT=15
 MONTH_COUNT=13
 EXTERNAL_PORT=8443
-REGIN=HK
-URL_ID=$(REGION)_$(openssl rand -hex 4 | tr -d '\n')
+REGION=HK
+URL_ID=$REGION_$(openssl rand -hex 4 | tr -d '\n')
 
-docker run -d --name vless_reality_$URL_ID --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=200m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT -e URL_ID=$URL_ID reality:v1
+docker run -d --name vless_reality_$URL_ID --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT -e URL_ID=$URL_ID vless_reality:v1
 
-docker run -d --name vless_reality_$URL_ID --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=200m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT -e URL_ID=$URL_ID -e DAY_COUNT=$DAY_COUNT -e MONTH_COUNT=$MONTH_COUNT reality:v1
+docker run -d --name vless_reality_$URL_ID --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT -e URL_ID=$URL_ID -e DAY_COUNT=$DAY_COUNT -e MONTH_COUNT=$MONTH_COUNT vless_reality:v1
 
 docker build -t reality:v7 .
 docker exec -it vless_reality_$URL_ID more vless_info.json 
