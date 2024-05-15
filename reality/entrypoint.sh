@@ -49,13 +49,25 @@ else
     URL_ID=$(openssl rand -hex 4 | tr -d '\n')
   fi
   
+   if [ -z "$REGION" ]; then
+    REGION_ID=$URL_ID
+    REGION="NA"
+    echo "region not set"
+  else
+    REGION_ID=${REGION}_${URL_ID}
+  fi
+
   CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
   EXPIRE_DATETIME=NA
   if [ -z "$DAY_COUNT" ]; then
+    echo "day not set"
+  else 
     EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day" +"%Y-%m-%d %H:%M:%S")
   fi
 
   if [ -z "$MONTH_COUNT" ]; then
+    echo "month not set"
+  else 
     EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
   fi
 
@@ -85,13 +97,14 @@ else
   echo "PUBLICKEY: $PUBLICKEY" >>/config_info.txt
   echo "NETWORK: $NETWORK" >>/config_info.txt
   if [ "$IPV4" != "null" ]; then
-    SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#wulabing_docker_vless_reality_vision"
-    URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$URL_ID"
+    SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality"
+    URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
     echo "IPV4 订阅连接: $SUB_IPV4" >>/config_info.txt
-    echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
+    # echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info.json <<EOF
     {
       "URL_ID": $URL_ID,
+      "REGION": $REGION,
       "IPV4": "$IPV4"
       "UUID": "$UUID",
       "DEST": "$DEST",
@@ -99,15 +112,29 @@ else
       "NETWORK": "$NETWORK",
       "URL_IPV4": "$URL_IPV4",
       "CREATE_DATETIME": "$CREATE_DATETIME",
-      "EXPIRE_DATETIME": "$EXPIRE_DATETIME",
-      "city": "$city"
+      "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
     }
 EOF
   fi
   if [ "$IPV6" != "null" ];then
-    SUB_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#wulabing_docker_vless_reality_vision"
+    SUB_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality_vision_V6"
+    URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$REGION_ID"
     echo "IPV6 订阅连接: $SUB_IPV6" >>/config_info.txt
-    echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
+    #echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
+    cat > vless_info_v6.json <<EOF
+    {
+      "URL_ID": $URL_ID,
+      "REGION": $REGION,
+      "IPV6": "$IPV6"
+      "UUID": "$UUID",
+      "DEST": "$DEST",
+      "PORT": "$EXTERNAL_PORT",
+      "NETWORK": "$NETWORK",
+      "URL_IPV6": "$URL_IPV6",
+      "CREATE_DATETIME": "$CREATE_DATETIME",
+      "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
+    }
+EOF
   fi
 
 
