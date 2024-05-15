@@ -63,6 +63,12 @@ else
     EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
   fi
 
+  if [ -z "$REGION" ]; then
+    echo "region not set"
+  else
+    URL_ID=$REGION_$URL_ID
+  fi
+
   # change config
   jq ".inbounds[0].settings.clients[0].id=\"$UUID\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
   jq ".inbounds[0].streamSettings.realitySettings.dest=\"$DEST\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
@@ -96,6 +102,7 @@ else
     cat > vless_info.json <<EOF
     {
       "URL_ID": $URL_ID,
+      "REGION": $REGION,
       "IPV4": "$IPV4"
       "UUID": "$UUID",
       "DEST": "$DEST",
@@ -115,6 +122,7 @@ EOF
     cat > vless_info_v6.json <<EOF
     {
       "URL_ID": $URL_ID,
+      "REGION": $REGION,
       "IPV6": "$IPV6"
       "UUID": "$UUID",
       "DEST": "$DEST",
