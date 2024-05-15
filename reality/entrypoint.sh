@@ -54,7 +54,7 @@ else
     REGION="NA"
     echo "region not set"
   else
-    REGION_ID=$(REGION)_$(URL_ID)
+    REGION_ID=${REGION}_${URL_ID}
   fi
 
   CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
@@ -100,7 +100,7 @@ else
     SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality"
     URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
     echo "IPV4 订阅连接: $SUB_IPV4" >>/config_info.txt
-    echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
+    # echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info.json <<EOF
     {
       "URL_ID": $URL_ID,
