@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  vless_reality:
+    image: vless_reality:v1
+    container_name: vless_reality_${URL_ID}
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    cpuset: "0-1"
+    cpu_shares: 512
+    mem_limit: 300m
+    ports:
+      - "${EXTERNAL_PORT}:443"
+    environment:
+      - EXTERNAL_PORT=${EXTERNAL_PORT}
+      - URL_ID=${URL_ID}
+      - REGION=${REGION}
