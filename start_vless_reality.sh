@@ -93,10 +93,15 @@ EXTERNAL_PORT=$EXTERNAL_PORT
 REGION=$REGION
 URL_ID=$URL_ID
 IMAGE_NAME=$IMAGE_NAME
+LATEST_VERSION=$LATEST_VERSION
 EOF
 
+cp docker-compose.yaml docker-compose-${URL_ID}.yaml
+
+sed -i "s/xray_vless_reality_service/vless_reality_${URL_ID}/g" docker-compose-${URL_ID}.yaml
+
 # 启动 Docker Compose 服务
-docker compose up -d
+docker compose up -d -f docker-compose-${URL_ID}.yaml
 
 # 等待容器启动完成
 sleep 10  # 等待容器内的服务启动
