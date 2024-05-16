@@ -103,9 +103,9 @@ else
     # echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info.json <<EOF
     {
-      "URL_ID": $URL_ID,
-      "REGION": $REGION,
-      "IPV4": "$IPV4"
+      "URL_ID": "$URL_ID",
+      "REGION": "$REGION",
+      "IPV4": "$IPV4",
       "UUID": "$UUID",
       "DEST": "$DEST",
       "PORT": "$EXTERNAL_PORT",
