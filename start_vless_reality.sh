@@ -111,9 +111,16 @@ echo "从容器中提取 JSON 文件对象值并生成二维码..."
 
 # 获取容器 ID 或名称
 CONTAINER_NAME="vless_reality_$URL_ID"
+echo "容器 ID 或名称: $CONTAINER_NAME"
 
+# JSON_OUTPUT=$(docker exec -it vless_reality_475eaf05 sh -c "cat vless_info.json")
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
 JSON_OUTPUT=$(docker exec -it $CONTAINER_NAME sh -c "cat vless_info.json")
+echo $JSON_OUTPUT
+URL_OUTPUT=$(echo "$JSON_OUTPUT" | jq -r '.url')
+echo $URL_OUTPUT
+echo "二维码生成。"
+echo "$URL_OUTPUT" | qrencode -o - -t UTF8
 VALUE=$(echo "$JSON_OUTPUT" | jq -r '.url')
 
 if [[ -z "$VALUE" ]]; then
