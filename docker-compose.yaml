@@ -21,4 +21,4 @@ services:
       - IMAGE_NAME=${IMAGE_NAME}
       - LATEST_VERSION=${LATEST_VERSION}
     volumes:
-      - /opt/docker/xray/data/${LATEST_VERSION}/${URL_ID}:/
+      - /opt/docker/xray/data/${LATEST_VERSION}/${URL_ID}/log/:/var/log/
