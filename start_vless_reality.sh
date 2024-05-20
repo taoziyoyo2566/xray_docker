@@ -85,23 +85,11 @@ fi
 # 设置 URL_ID
 URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 
-# 创建 .env 文件
-cat <<EOF > .env
-DAY_COUNT=$DAY_COUNT
-MONTH_COUNT=$MONTH_COUNT
-EXTERNAL_PORT=$EXTERNAL_PORT
-REGION=$REGION
-URL_ID=$URL_ID
-IMAGE_NAME=$IMAGE_NAME
-LATEST_VERSION=$LATEST_VERSION
-EOF
+# 启动 Docker 容器
+CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
+docker run -d --name $CONTAINER_NAME  --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p ${EXTERNAL_PORT}:${EXTERNAL_PORT} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
-cp docker-compose.yaml docker-compose-${URL_ID}.yaml
 
-sed -i "s/xray_vless_reality_service/vless_reality_${URL_ID}/g" docker-compose-${URL_ID}.yaml
-
-# 启动 Docker Compose 服务
-COMPOSE_FILE=docker-compose-${URL_ID}.yaml docker compose up -d
 
 # 等待容器启动完成
 sleep 10  # 等待容器内的服务启动
@@ -117,9 +105,10 @@ echo "容器 ID 或名称: $CONTAINER_NAME"
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
 JSON_OUTPUT=$(docker exec -it $CONTAINER_NAME sh -c "cat vless_info.json")
 echo $JSON_OUTPUT
+echo "二维码生成。"
 URL_OUTPUT=$(echo "$JSON_OUTPUT" | jq -r '.url')
 echo $URL_OUTPUT
-echo "二维码生成。"
+
 echo "$URL_OUTPUT" | qrencode -o - -t UTF8
 VALUE=$(echo "$JSON_OUTPUT" | jq -r '.url')
 
