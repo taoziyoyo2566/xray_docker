@@ -89,6 +89,10 @@ URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
 docker run -d --name $CONTAINER_NAME  --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p ${EXTERNAL_PORT}:${EXTERNAL_PORT} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 135807134090b5243aa3c55bac7b4b9a01057e14
 
 # 等待容器启动完成
 sleep 10  # 等待容器内的服务启动
