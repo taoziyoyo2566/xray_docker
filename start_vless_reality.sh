@@ -1,10 +1,16 @@
 #!/bin/bash
 
-# 获取最新版本号函数
-get_latest_version() {
+# 获取最新版本号和创建时间函数
+get_latest_version_and_time() {
     local base_name="$1"
-    local latest_version=$(docker images --format "{{.Tag}}" $base_name | sort -V | tail -n 1)
-    echo "$latest_version"
+    local latest_image_info=$(docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedAt}}" $base_name | sort -r | head -n 1)
+    if [[ -z "$latest_image_info" ]]; then
+        echo ""
+    else
+        local latest_version=$(echo $latest_image_info | awk '{print $1}' | cut -d ':' -f 2)
+        local latest_time=$(echo $latest_image_info | awk '{print $2, $3, $4, $5, $6}')
+        echo "$latest_version $latest_time"
+    fi
 }
 
 # 计算新版本号函数
@@ -16,12 +22,21 @@ increment_version() {
     echo "${major_version}.${minor_version}"
 }
 
+BASE_IMAGE_NAME="vless_reality"
+LATEST_INFO=$(get_latest_version_and_time $BASE_IMAGE_NAME)
+
+if [[ -n "$LATEST_INFO" ]]; then
+    LATEST_VERSION=$(echo $LATEST_INFO | awk '{print $1}')
+    LATEST_TIME=$(echo $LATEST_INFO | awk '{print $2, $3, $4, $5, $6}')
+    echo "最新镜像版本: $LATEST_VERSION"
+    echo "制作时间: $LATEST_TIME"
+else
+    echo "没有找到最新镜像的信息。"
+fi
+
 # 提示是否重新打包一个镜像
 read -p "是否重新打包一个镜像？(Y/N): " REPACK
 if [[ "$REPACK" == "Y" || "$REPACK" == "y" ]]; then
-    BASE_IMAGE_NAME="vless_reality"
-    LATEST_VERSION=$(get_latest_version $BASE_IMAGE_NAME)
-    
     if [[ -z "$LATEST_VERSION" ]]; then
         NEW_VERSION="v1.0"
     else
@@ -36,7 +51,6 @@ if [[ "$REPACK" == "Y" || "$REPACK" == "y" ]]; then
         exit 1
     fi
 else
-    LATEST_VERSION=$(get_latest_version "vless_reality")
     if [[ -z "$LATEST_VERSION" ]]; then
         echo "没有可用的镜像。请先构建一个镜像。"
         exit 1
@@ -47,18 +61,14 @@ fi
 
 # 输入并验证 DAY_COUNT
 read -p "请输入天数 (1-30): " DAY_COUNT
-if [[ -z "$DAY_COUNT" ]]; then
-    DAY_COUNT=""
-elif ! [[ "$DAY_COUNT" =~ ^[1-9]$|^[12][0-9]$|^30$ ]]; then
+if [[ -n "$DAY_COUNT" && ! "$DAY_COUNT" =~ ^[1-9]$|^[12][0-9]$|^30$ ]]; then
     echo "输入无效，天数必须在 1-30 之间的数字。"
     exit 1
 fi
 
 # 输入并验证 MONTH_COUNT
 read -p "请输入月数: " MONTH_COUNT
-if [[ -z "$MONTH_COUNT" ]]; then
-    MONTH_COUNT=""
-elif ! [[ "$MONTH_COUNT" =~ ^[0-9]+$ ]]; then
+if [[ -n "$MONTH_COUNT" && ! "$MONTH_COUNT" =~ ^[0-9]+$ ]]; then
     echo "输入无效，月数必须是一个数字。"
     exit 1
 fi
@@ -74,10 +84,7 @@ fi
 
 # 输入并验证 EXTERNAL_PORT
 read -p "请输入外部端口号 (20000以上): " EXTERNAL_PORT
-if [[ -z "$EXTERNAL_PORT" ]]; then
-    echo "输入无效，外部端口号不能为空。退出。"
-    exit 1
-elif ! [[ "$EXTERNAL_PORT" =~ ^[0-9]+$ ]] || [ "$EXTERNAL_PORT" -le 20000 ]; then
+if [[ -z "$EXTERNAL_PORT" || ! "$EXTERNAL_PORT" =~ ^[0-9]+$ || "$EXTERNAL_PORT" -le 20000 ]]; then
     echo "输入无效，外部端口号必须是20000以上的数字。"
     exit 1
 fi
@@ -87,12 +94,7 @@ URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 
 # 启动 Docker 容器
 CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
-docker run -d --name $CONTAINER_NAME  --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p ${EXTERNAL_PORT}:${EXTERNAL_PORT} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
-
-<<<<<<< HEAD
-=======
-
->>>>>>> 135807134090b5243aa3c55bac7b4b9a01057e14
+docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p ${EXTERNAL_PORT}:${EXTERNAL_PORT} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
 # 等待容器启动完成
 sleep 10  # 等待容器内的服务启动
@@ -101,26 +103,23 @@ sleep 10  # 等待容器内的服务启动
 echo "从容器中提取 JSON 文件对象值并生成二维码..."
 
 # 获取容器 ID 或名称
-CONTAINER_NAME="qreality_$URL_ID"
 echo "容器 ID 或名称: $CONTAINER_NAME"
 
 # JSON_OUTPUT=$(docker exec -it qreality_475eaf05 sh -c "cat vless_info.json")
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
 JSON_OUTPUT=$(docker exec -it $CONTAINER_NAME sh -c "cat vless_info.json")
-echo $JSON_OUTPUT
-echo "二维码生成。"
-URL_OUTPUT=$(echo "$JSON_OUTPUT" | jq -r '.url')
-echo $URL_OUTPUT
+if [[ -z "$JSON_OUTPUT" ]]; then
+    echo "未能从容器中提取 JSON 文件。"
+    exit 1
+fi
 
-echo "$URL_OUTPUT" | qrencode -o - -t UTF8
-VALUE=$(echo "$JSON_OUTPUT" | jq -r '.url')
-
-if [[ -z "$VALUE" ]]; then
+URL_OUTPUT=$(echo "$JSON_OUTPUT" | jq -r '.URL_IPV4')
+if [[ -z "$URL_OUTPUT" ]]; then
     echo "未找到有效的 URL。"
     exit 1
 fi
 
-# 生成二维码并显示
-echo "$VALUE" | qrencode -o - -t UTF8
+echo "$URL_OUTPUT"
+echo "$URL_OUTPUT" | qrencode -o - -t UTF8
 
 echo "二维码生成完毕。"
