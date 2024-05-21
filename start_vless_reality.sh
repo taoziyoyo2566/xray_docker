@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#create a customize network
+create_docker_network() {
+    local network_name=$1
+    if ! docker network ls | grep -qw $network_name; then
+        docker network create $network_name
+    fi
+}
+
 # 检查端口是否在使用中
 is_port_in_use() {
     local port=$1
@@ -136,12 +144,26 @@ fi
 # 输入并验证 EXTERNAL_PORT
 EXTERNAL_PORT=$PORT
 
-# 设置 URL_ID
-#URL_ID=$(openssl rand -hex 4 | tr -d '\n')
-echo "######################## URL_ID: $URL_ID"
+# Create a network-limited network
+network_name="network-vless"
+create_docker_network ${network_name}
+
 # 启动 Docker 容器
 CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
-docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
+docker run \
+    --name "$CONTAINER_NAME" \
+    --restart=always \
+    --network "${network_name}" \
+    --log-opt max-size=50m \
+    --cpuset-cpus="0-1" --cpu-shares=512 \
+    -m=300m \
+    -p "$EXTERNAL_PORT":443 \
+    -e EXTERNAL_PORT="$EXTERNAL_PORT" \
+    --env DAY_COUNT="${DAY_COUNT}" \
+    --env MONTH_COUNT="${MONTH_COUNT}" \
+    --env REGION="${REGION}" \
+    --env URL_ID="${URL_ID}" \
+    -d "${IMAGE_NAME}"
 
 # 等待容器启动完成
 sleep 5  # 等待容器内的服务启动
