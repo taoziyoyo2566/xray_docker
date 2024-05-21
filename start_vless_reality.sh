@@ -1,5 +1,56 @@
 #!/bin/bash
 
+# 检查端口是否在使用中
+is_port_in_use() {
+    local port=$1
+    if netstat -tuln | grep ":$port\b" >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# 随机生成一个不在使用中的端口号
+generate_random_port() {
+    while true; do
+        port=$((RANDOM + 20000))
+        if [ $port -le 65535 ] && ! is_port_in_use $port; then
+            echo $port
+            return
+        fi
+    done
+}
+
+# 检查参数数量
+if [[ $# -eq 0 ]]; then
+    URL_ID=$(openssl rand -hex 4 | tr -d '\n')
+    PORT=$(generate_random_port)
+elif [[ $# -eq 2 ]]; then
+    URL_ID="$1"
+    PORT="$2"
+
+    if ! [[ "$URL_ID" =~ ^[A-Za-z0-9]{8}$ ]]; then
+        echo "错误：参数1（URL_ID）必须是8位英数字。"
+        exit 1
+    fi
+
+    if ! [[ "$PORT" =~ ^[0-9]{5}$ ]] || [ "$PORT" -le 20000 ]; then
+        echo "错误：参数2（PORT）必须是5位大于20000的端口号。"
+        exit 1
+    fi
+
+    if is_port_in_use $PORT; then
+        echo "错误：端口号 $PORT 已在使用中。"
+        exit 1
+    fi
+else
+    echo "错误：要么不输入参数，要么必须输入两个参数。"
+    exit 1
+fi
+
+echo "URL_ID: $URL_ID"
+echo "PORT: $PORT"
+
 # 获取最新版本号和创建时间函数
 get_latest_version_and_time() {
     local base_name="$1"
@@ -83,15 +134,11 @@ elif ! [[ "$REGION" =~ ^[A-Za-z]{2}$ ]]; then
 fi
 
 # 输入并验证 EXTERNAL_PORT
-read -p "请输入外部端口号 (20000以上): " EXTERNAL_PORT
-if [[ -z "$EXTERNAL_PORT" || ! "$EXTERNAL_PORT" =~ ^[0-9]+$ || "$EXTERNAL_PORT" -le 20000 ]]; then
-    echo "输入无效，外部端口号必须是20000以上的数字。"
-    exit 1
-fi
+EXTERNAL_PORT=$PORT
 
 # 设置 URL_ID
-URL_ID=$(openssl rand -hex 4 | tr -d '\n')
-
+#URL_ID=$(openssl rand -hex 4 | tr -d '\n')
+echo "######################## URL_ID: $URL_ID"
 # 启动 Docker 容器
 CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
 docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
@@ -104,9 +151,7 @@ echo "从容器中提取 JSON 文件对象值并生成二维码..."
 
 # 获取容器 ID 或名称
 echo "容器 ID 或名称: $CONTAINER_NAME"
-echo "EXTERNAL_PORT: $EXTERNAL_PORT"
-echo "DAY_COUNT: $DAY_COUNT"
-echo "MONTH_COUNT: $MONTH_COUNT"
+echo "端口: $EXTERNAL_PORT"
 
 # JSON_OUTPUT=$(docker exec -it qreality_475eaf05 sh -c "cat vless_info.json")
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
