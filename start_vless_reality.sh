@@ -94,21 +94,24 @@ URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 
 # 启动 Docker 容器
 CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
-docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p ${EXTERNAL_PORT}:${EXTERNAL_PORT} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
+docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
 # 等待容器启动完成
-sleep 10  # 等待容器内的服务启动
+sleep 5  # 等待容器内的服务启动
 
 # 提取容器内的 JSON 文件对象值并生成二维码
 echo "从容器中提取 JSON 文件对象值并生成二维码..."
 
 # 获取容器 ID 或名称
 echo "容器 ID 或名称: $CONTAINER_NAME"
+echo "EXTERNAL_PORT: $EXTERNAL_PORT"
+echo "DAY_COUNT: $DAY_COUNT"
+echo "MONTH_COUNT: $MONTH_COUNT"
 
 # JSON_OUTPUT=$(docker exec -it qreality_475eaf05 sh -c "cat vless_info.json")
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
 JSON_OUTPUT=$(docker exec -it $CONTAINER_NAME sh -c "cat vless_info.json")
-if [[ -z "$JSON_OUTPUT" ]]; then
+ if [[ -z "$JSON_OUTPUT" ]]; then
     echo "未能从容器中提取 JSON 文件。"
     exit 1
 fi
