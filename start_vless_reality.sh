@@ -73,7 +73,7 @@ increment_version() {
     echo "${major_version}.${minor_version}"
 }
 
-BASE_IMAGE_NAME="vless_reality"
+BASE_IMAGE_NAME="qreality"
 LATEST_INFO=$(get_latest_version_and_time $BASE_IMAGE_NAME)
 
 if [[ -n "$LATEST_INFO" ]]; then
