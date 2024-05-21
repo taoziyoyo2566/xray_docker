@@ -102,18 +102,18 @@ else
     echo "IPV4 订阅连接: $SUB_IPV4" >>/config_info.txt
     # echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info.json <<EOF
-    {
-      "URL_ID": $URL_ID,
-      "REGION": $REGION,
-      "IPV4": "$IPV4"
-      "UUID": "$UUID",
-      "DEST": "$DEST",
-      "PORT": "$EXTERNAL_PORT",
-      "NETWORK": "$NETWORK",
-      "URL_IPV4": "$URL_IPV4",
-      "CREATE_DATETIME": "$CREATE_DATETIME",
-      "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
-    }
+{
+  "URL_ID": "$URL_ID",
+  "REGION": "$REGION",
+  "IPV4": "$IPV4",
+  "UUID": "$UUID",
+  "DEST": "$DEST",
+  "PORT": "$EXTERNAL_PORT",
+  "NETWORK": "$NETWORK",
+  "URL_IPV4": "$URL_IPV4",
+  "CREATE_DATETIME": "$CREATE_DATETIME",
+  "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
+}
 EOF
   fi
   if [ "$IPV6" != "null" ];then
@@ -122,18 +122,18 @@ EOF
     echo "IPV6 订阅连接: $SUB_IPV6" >>/config_info.txt
     #echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info_v6.json <<EOF
-    {
-      "URL_ID": $URL_ID,
-      "REGION": $REGION,
-      "IPV6": "$IPV6"
-      "UUID": "$UUID",
-      "DEST": "$DEST",
-      "PORT": "$EXTERNAL_PORT",
-      "NETWORK": "$NETWORK",
-      "URL_IPV6": "$URL_IPV6",
-      "CREATE_DATETIME": "$CREATE_DATETIME",
-      "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
-    }
+{
+  "URL_ID": $URL_ID,
+  "REGION": $REGION,
+  "IPV6": "$IPV6"
+  "UUID": "$UUID",
+  "DEST": "$DEST",
+  "PORT": "$EXTERNAL_PORT",
+  "NETWORK": "$NETWORK",
+  "URL_IPV6": "$URL_IPV6",
+  "CREATE_DATETIME": "$CREATE_DATETIME",
+  "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
+}
 EOF
   fi
 

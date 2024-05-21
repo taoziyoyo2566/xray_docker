@@ -19,5 +19,4 @@ docker exec -it vless_reality_$URL_ID more vless_info.json
 docker exec -it vless_reality_$URL_ID more vless_info_v6.json 
 docker logs vless_reality_$URL_ID
 
-docker ps -a --format "{{.ID}} {{.Names}}" | grep -v "reality" | cut -d " " -f1 | xargs -r docker stop
-docker ps -a --format "{{.ID}} {{.Names}}" | grep -E "reality" | cut -d " " -f1 | xargs -r docker stop
+docker ps -a --format "{{.ID}} {{.Names}}" | grep  "reality" | cut -d " " -f1 | xargs -r docker stop
