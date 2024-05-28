@@ -106,7 +106,7 @@ else
         echo "没有可用的镜像。请先构建一个镜像。"
         exit 1
     fi
-    IMAGE_NAME="vless_reality:${LATEST_VERSION}"
+    IMAGE_NAME="qreality:${LATEST_VERSION}"
     echo "使用现有的最新镜像 $IMAGE_NAME ..."
 fi
 
