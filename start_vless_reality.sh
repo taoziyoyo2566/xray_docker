@@ -73,7 +73,7 @@ increment_version() {
     echo "${major_version}.${minor_version}"
 }
 
-BASE_IMAGE_NAME="qreality"
+BASE_IMAGE_NAME="reality"
 LATEST_INFO=$(get_latest_version_and_time $BASE_IMAGE_NAME)
 
 if [[ -n "$LATEST_INFO" ]]; then
@@ -106,7 +106,7 @@ else
         echo "没有可用的镜像。请先构建一个镜像。"
         exit 1
     fi
-    IMAGE_NAME="qreality:${LATEST_VERSION}"
+    IMAGE_NAME="reality:${LATEST_VERSION}"
     echo "使用现有的最新镜像 $IMAGE_NAME ..."
 fi
 
@@ -128,7 +128,7 @@ fi
 read -p "请输入区域 (默认为 US, 必须是2位英文字母): " REGION
 if [[ -z "$REGION" ]]; then
     REGION="US"
-elif ! [[ "$REGION" =~ ^[A-Za-z]{2}$ ]]; then
+elif ! [[ "$REGION" =~ ^[A-Za-z]{3}$ ]]; then
     echo "输入无效，区域必须是2位英文字母。"
     exit 1
 fi
@@ -140,7 +140,7 @@ EXTERNAL_PORT=$PORT
 #URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 echo "######################## URL_ID: $URL_ID"
 # 启动 Docker 容器
-CONTAINER_NAME="qreality_${REGION}_${URL_ID}"
+CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
 # 等待容器启动完成
@@ -153,7 +153,7 @@ echo "从容器中提取 JSON 文件对象值并生成二维码..."
 echo "容器 ID 或名称: $CONTAINER_NAME"
 echo "端口: $EXTERNAL_PORT"
 
-# JSON_OUTPUT=$(docker exec -it qreality_475eaf05 sh -c "cat vless_info.json")
+# JSON_OUTPUT=$(docker exec -it reality_475eaf05 sh -c "cat vless_info.json")
 # 提取 JSON 对象值（假设 JSON 文件中的 key 为 "url"）
 JSON_OUTPUT=$(docker exec -it $CONTAINER_NAME sh -c "cat vless_info.json")
  if [[ -z "$JSON_OUTPUT" ]]; then
