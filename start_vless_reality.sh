@@ -1,5 +1,26 @@
 #!/bin/bash
 
+# Function to check if the software is installed
+# Array of software names to check
+SOFTWARE_LIST=("docker" "qrencode" "jq" "git" "curl")
+
+# Function to check if software is installed
+check_software() {
+    local software_name=$1  # Get the software name from the function argument
+
+    if command -v "$software_name" &> /dev/null; then
+        echo "$software_name is installed."
+    else
+        echo "$software_name is not installed."
+	  exit 1
+    fi
+}
+
+# Loop through the list and check each software
+for software_name in "${SOFTWARE_LIST[@]}"; do
+    check_software "$software_name"
+done
+
 # 检查端口是否在使用中
 is_port_in_use() {
     local port=$1
