@@ -20,3 +20,18 @@ docker exec -it vless_reality_$URL_ID more vless_info_v6.json
 docker logs vless_reality_$URL_ID
 
 docker ps -a --format "{{.ID}} {{.Names}}" | grep  "reality" | cut -d " " -f1 | xargs -r docker stop
+
+# memory setting
+sudo swapoff /swapfile
+sudo rm /swapfile
+
+sudo fallocate -l 2G /swapfile
+sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sudo swapon --show
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p

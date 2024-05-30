@@ -141,7 +141,7 @@ EXTERNAL_PORT=$PORT
 echo "######################## URL_ID: $URL_ID"
 # 启动 Docker 容器
 CONTAINER_NAME="reality_${REGION}_${URL_ID}"
-docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpuset-cpus="0-1" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
+docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpus="0.5" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME
 
 # 等待容器启动完成
 sleep 5  # 等待容器内的服务启动
