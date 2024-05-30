@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Function to check if the software is installed
+# Array of software names to check
+SOFTWARE_LIST=("jq" "qrencode" "git" "docker")
+
+# Function to check if all required software is installed
+check_required_software() {
+    for software_name in "${SOFTWARE_LIST[@]}"; do
+        if ! command -v "$software_name" &> /dev/null; then
+#            echo "${software_name}  is not installed. "
+            echo "Error: Some required software packages are not installed.  ${software_name}"
+            return 1  # Return error code 1 if any software is not installed
+        fi
+    done
+    return 0  # Return success code 0 if all software is installed
+}
+
 # 检查端口是否在使用中
 is_port_in_use() {
     local port=$1
