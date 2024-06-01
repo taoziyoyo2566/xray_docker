@@ -20,3 +20,5 @@ docker exec -it vless_reality_$URL_ID more vless_info_v6.json
 docker logs vless_reality_$URL_ID
 
 docker ps -a --format "{{.ID}} {{.Names}}" | grep  "reality" | cut -d " " -f1 | xargs -r docker stop
+
+bash start_vless_reality.sh -e URL_ID=12345678 -e PORT=23456 -e MONTHS=3 -e REGION=TTUS

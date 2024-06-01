@@ -3,8 +3,6 @@ FROM golang:alpine as builder
 LABEL maintainer="wulabing <wulabing@gmail.com>"
 LABEL version="0.0.16"
 
-
-#ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /app
 
 RUN apk add --no-cache git  && git clone https://github.com/XTLS/Xray-core.git . && \
@@ -13,7 +11,6 @@ RUN apk add --no-cache git  && git clone https://github.com/XTLS/Xray-core.git .
 
 # runner
 FROM alpine:latest as runner
-
 
 ENV UUID=""
 ENV DEST=""
@@ -33,10 +30,14 @@ COPY ./config.json /
 COPY --from=builder /app/xray /
 
 RUN apk update && \
-    apk add --no-cache tzdata ca-certificates jq curl openssl libqrencode coreutils wget && \
-    mkdir -p /var/log/xray &&\
+    apk add --no-cache tzdata ca-certificates jq curl openssl libqrencode coreutils wget bash openrc iproute2 && \
+    mkdir -p /var/log/xray && \
     wget -O /geosite.dat https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat && \
     wget -O /geoip.dat https://github.com/v2fly/geoip/releases/latest/download/geoip.dat && \
+    curl -LO https://pkg.cloudflareclient.com/cloudflare-warp-linux-latest-amd64.tgz && \
+    tar -xzf cloudflare-warp-linux-latest-amd64.tgz && \
+    mv cloudflare-warp /usr/local/bin/warp-cli && \
+    rm -rf cloudflare-warp-linux-latest-amd64.tgz && \
     chmod +x /entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
