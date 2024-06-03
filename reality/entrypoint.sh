@@ -1,52 +1,11 @@
 #!/bin/sh
-
-echoContent() {
-    local color=$1
-    local content=$2
-    case $color in
-        green)
-            echo -e "\e[32m${content}\e[0m"
-            ;;
-        red)
-            echo -e "\e[31m${content}\e[0m"
-            ;;
-        *)
-            echo "$content"
-            ;;
-    esac
-}
-
-# Install and configure WARP
-echoContent green " ---> Install WARP"
-warp-cli --version >/dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    echoContent red " ---> Failed to install WARP"
-    exit 0
-fi
-
-echoContent green " ---> Starting WARP"
-warp-cli --accept-tos register
-warp-cli --accept-tos set-mode proxy
-warp-cli --accept-tos set-proxy-port 31303
-warp-cli --accept-tos connect
-warp-cli --accept-tos enable-always-on
-
-warpStatus=$(curl -s --socks5 127.0.0.1:31303 https://www.cloudflare.com/cdn-cgi/trace | grep "warp" | cut -d "=" -f 2)
-
-if [[ "${warpStatus}" == "on" ]]; then
-    echoContent green " ---> WARP started successfully"
-else
-    echoContent red " ---> WARP failed to start"
-fi
-
 if [ -f /config_info.txt ]; then
-  echo "config.json exists"
+  echo "config.json exist"
 else
-  IPV6=$(curl -6 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
-  IPV4=$(curl -4 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
-
+  IPV6=$(curl -6 -sSL --connect-timeout 3 --retry 2  ip.sb || echo "null")
+  IPV4=$(curl -4 -sSL --connect-timeout 3 --retry 2  ip.sb || echo "null")
   if [ -z "$UUID" ]; then
-    echo "UUID is not set, generate random UUID"
+    echo "UUID is not set, generate random UUID "
     UUID="$(/xray uuid)"
     echo "UUID: $UUID"
   fi
@@ -74,23 +33,23 @@ else
   if [ -z "$PRIVATEKEY" ]; then
     echo "PRIVATEKEY is not set. generate new key"
     /xray x25519 >/key
-    PRIVATEKEY=$(grep "Private" /key | awk -F ': ' '{print $2}')
-    PUBLICKEY=$(grep "Public" /key | awk -F ': ' '{print $2}')
+    PRIVATEKEY=$(cat /key | grep "Private" | awk -F ': ' '{print $2}')
+    PUBLICKEY=$(cat /key | grep "Public" | awk -F ': ' '{print $2}')
     echo "Private key: $PRIVATEKEY"
     echo "Public key: $PUBLICKEY"
   fi
 
   if [ -z "$NETWORK" ]; then
-    echo "NETWORK is not set, set default value tcp"
+    echo "NETWORK is not set,set default value tcp"
     NETWORK="tcp"
   fi
 
   if [ -z "$URL_ID" ]; then
-    echo "URL_ID is not set, set default value random"
+    echo "URL_ID is not set,set default value random"
     URL_ID=$(openssl rand -hex 4 | tr -d '\n')
   fi
 
-  if [ -z "$REGION" ]; then
+   if [ -z "$REGION" ]; then
     REGION_ID=$URL_ID
     REGION="NA"
     echo "region not set"
@@ -100,7 +59,6 @@ else
 
   CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
   EXPIRE_DATETIME=NA
-
   if [ -z "$DAY_COUNT" ]; then
     echo "day not set"
   else
@@ -113,7 +71,7 @@ else
     EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
   fi
 
-  # Change config
+  # change config
   jq ".inbounds[0].settings.clients[0].id=\"$UUID\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
   jq ".inbounds[0].streamSettings.realitySettings.dest=\"$DEST\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
 
@@ -123,8 +81,11 @@ else
   jq ".inbounds[0].streamSettings.realitySettings.privateKey=\"$PRIVATEKEY\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
   jq ".inbounds[0].streamSettings.network=\"$NETWORK\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
 
+
+
+
   FIRST_SERVERNAME=$(echo $SERVERNAMES | awk '{print $1}')
-  # Config info with green color
+  # config info with green color
   echo -e "\033[32m" >/config_info.txt
   echo "IPV6: $IPV6" >>/config_info.txt
   echo "IPV4: $IPV4" >>/config_info.txt
@@ -135,7 +96,6 @@ else
   echo "PRIVATEKEY: $PRIVATEKEY" >>/config_info.txt
   echo "PUBLICKEY: $PUBLICKEY" >>/config_info.txt
   echo "NETWORK: $NETWORK" >>/config_info.txt
-
   if [ "$IPV4" != "null" ]; then
     SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality"
     URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
@@ -156,17 +116,16 @@ else
 }
 EOF
   fi
-
   if [ "$IPV6" != "null" ];then
     SUB_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality_vision_V6"
     URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$REGION_ID"
     echo "IPV6 订阅连接: $SUB_IPV6" >>/config_info.txt
-    # echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
+    #echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
     cat > vless_info_v6.json <<EOF
 {
-  "URL_ID": "$URL_ID",
-  "REGION": "$REGION",
-  "IPV6": "$IPV6",
+  "URL_ID": $URL_ID,
+  "REGION": $REGION,
+  "IPV6": "$IPV6"
   "UUID": "$UUID",
   "DEST": "$DEST",
   "PORT": "$EXTERNAL_PORT",
@@ -178,7 +137,9 @@ EOF
 EOF
   fi
 
+
   echo -e "\033[0m" >>/config_info.txt
+
 fi
 
 # show config info
