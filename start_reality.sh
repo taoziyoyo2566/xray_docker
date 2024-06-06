@@ -179,21 +179,7 @@ echo "######################## URL_ID: $URL_ID"
 CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
 # 构建 docker run 命令
-DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpus=\"0.5\" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env REGION=${REGION} --env URL_ID=${URL_ID} $IMAGE_NAME"
-
-# 如果 DAY_COUNT 非空，添加到 docker run 命令中
-if [[ -n "$DAY_COUNT" && "$DAY_COUNT" =~ ^[1-9]$|^[12][0-9]$|^30$  ]]; then
-    DOCKER_RUN_CMD="$DOCKER_RUN_CMD --env DAY_COUNT=${DAY_COUNT}"
-else
-    echo "输入无效，天数必须在 1-30 之间的数字。 skip..."
-fi
-
-# 如果 MONTH_COUNT 非空，添加到 docker run 命令中
-if [[ -n "$MONTH_COUNT" && "$MONTH_COUNT" =~ ^[0-9]+$ ]]; then
-    DOCKER_RUN_CMD="$DOCKER_RUN_CMD --env MONTH_COUNT=${MONTH_COUNT}"
-else
-    echo "输入无效，月数必须是一个数字。"
-fi
+DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpus=\"0.5\" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env REGION=${REGION} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env URL_ID=${URL_ID} $IMAGE_NAME"
 
 # 执行 docker run 命令
 eval $DOCKER_RUN_CMD
@@ -224,4 +210,7 @@ fi
 echo "$URL_OUTPUT"
 echo "$URL_OUTPUT" | qrencode -o - -t UTF8
 
+mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}
+docker cp ${CONTAINER_NAME}:vless_info.json /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/
+cat /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/vless_info.json
 echo "二维码生成完毕。"

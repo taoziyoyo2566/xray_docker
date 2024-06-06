@@ -59,16 +59,15 @@ else
 
   CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
   EXPIRE_DATETIME=NA
-  if [ -z "$DAY_COUNT" ]; then
-    echo "day not set"
-  else
-    EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day" +"%Y-%m-%d %H:%M:%S")
-  fi
 
-  if [ -z "$MONTH_COUNT" ]; then
-    echo "month not set"
-  else
+  if [ -n "$DAY_COUNT" ] && [ -n "$MONTH_COUNT" ]; then
+    EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day +${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
+  elif [ -n "$DAY_COUNT" ]; then
+    EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day" +"%Y-%m-%d %H:%M:%S")
+  elif [ -n "$MONTH_COUNT" ]; then
     EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
+  else
+    echo "Neither day nor month set"
   fi
 
   # change config
@@ -80,9 +79,6 @@ else
 
   jq ".inbounds[0].streamSettings.realitySettings.privateKey=\"$PRIVATEKEY\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
   jq ".inbounds[0].streamSettings.network=\"$NETWORK\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
-
-
-
 
   FIRST_SERVERNAME=$(echo $SERVERNAMES | awk '{print $1}')
   # config info with green color
@@ -112,7 +108,8 @@ else
   "NETWORK": "$NETWORK",
   "URL_IPV4": "$URL_IPV4",
   "CREATE_DATETIME": "$CREATE_DATETIME",
-  "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
+  "EXPIRE_DATETIME": "$EXPIRE_DATETIME",
+  "DAYS": "$DAY_COUNT"
 }
 EOF
   fi
@@ -136,10 +133,7 @@ EOF
 }
 EOF
   fi
-
-
   echo -e "\033[0m" >>/config_info.txt
-
 fi
 
 # show config info
