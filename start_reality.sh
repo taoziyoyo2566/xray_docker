@@ -207,10 +207,16 @@ if [[ -z "$URL_OUTPUT" ]]; then
     exit 1
 fi
 
+mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}
+docker cp ${CONTAINER_NAME}:vless_info.json /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/ > /dev/null 2>&1 && \
+docker cp ${CONTAINER_NAME}:config_info.txt /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/ > /dev/null 2>&1
+
 echo "$URL_OUTPUT"
 echo "$URL_OUTPUT" | qrencode -o - -t UTF8
+echo "$URL_OUTPUT" | qrencode -o - -t UTF8 >> /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/vless_info.json
 
-mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}
-docker cp ${CONTAINER_NAME}:vless_info.json /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/
-cat /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/vless_info.json
-echo "二维码生成完毕。"
+if [ $? -eq 0 ]; then
+  echo "Operation completed successfully."
+else
+  echo "Error: Operation failed."
+fi
