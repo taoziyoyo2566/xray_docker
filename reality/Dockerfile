@@ -31,6 +31,10 @@ COPY ./entrypoint.sh /
 COPY ./config.json /
 
 COPY --from=builder /app/xray /
+RUN mkdir -p /etc/wireguard &&\
+    wget -N -P /etc/wireguard https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&\
+    chmod +x /etc/wireguard/menu.sh &&\
+    ln -sf /etc/wireguard/menu.sh /usr/bin/warp
 
 RUN apk update && \
     apk add --no-cache tzdata ca-certificates jq curl openssl libqrencode coreutils wget && \
