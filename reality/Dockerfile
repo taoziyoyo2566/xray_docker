@@ -32,8 +32,13 @@ COPY ./config.json /
 
 COPY --from=builder /app/xray /
 
+RUN mkdir -p /etc/wireguard &&\
+    wget -N -P /etc/wireguard https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&\
+    chmod +x /etc/wireguard/menu.sh &&\
+    ln -sf /etc/wireguard/menu.sh /usr/bin/warp
+
 RUN apk update && \
-    apk add --no-cache tzdata ca-certificates jq curl openssl libqrencode coreutils wget && \
+    apk add --no-cache tzdata ca-certificates jq curl openssl libqrencode coreutils wget net-tools && \
     mkdir -p /var/log/xray &&\
     wget -O /geosite.dat https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat && \
     wget -O /geoip.dat https://github.com/v2fly/geoip/releases/latest/download/geoip.dat && \
