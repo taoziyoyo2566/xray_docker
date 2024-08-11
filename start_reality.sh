@@ -7,7 +7,6 @@ SOFTWARE_LIST=("docker" "qrencode" "jq" "git" "curl")
 # Function to check if software is installed
 check_software() {
     local software_name=$1  # Get the software name from the function argument
-
     if command -v "$software_name" &> /dev/null; then
         echo "$software_name is installed."
     else
@@ -47,7 +46,9 @@ URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 PORT=$(generate_random_port)
 DAY_COUNT=""
 MONTH_COUNT=""
-REGION="TTUS"  # Default region
+REGION="TTTUS"  # Default region
+CPU_LIMIT="0.5" # Default CPU limit (0.5 cores)
+MEMORY_LIMIT="300m" # Default memory limit (300 MB)
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -69,6 +70,12 @@ while [[ "$#" -gt 0 ]]; do
                 ;;
                 REGION=*)
                 REGION="${1#REGION=}"
+                ;;
+                CPU=*)
+                CPU_LIMIT="${1#CPU=}"
+                ;;
+                MEMORY=*)
+                MEMORY_LIMIT="${1#MEMORY=}"
                 ;;
                 *)
                 echo "Unknown environment variable $1"
@@ -102,7 +109,7 @@ if is_port_in_use $PORT; then
 fi
 
 # Validate REGION
-if ! [[ "$REGION" =~ ^[A-Za-z]{4}$ ]]; then
+if ! [[ "$REGION" =~ ^[A-Za-z]{5}$ ]]; then
     echo "错误：参数 REGION 必须是4位英文字母。"
     exit 1
 fi
@@ -179,13 +186,14 @@ echo "######################## URL_ID: $URL_ID"
 CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
 # 构建 docker run 命令
-DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m --cpus=\"0.5\" --cpu-shares=512 -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env REGION=${REGION} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env URL_ID=${URL_ID} $IMAGE_NAME"
+# shellcheck disable=SC2027
+DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m  --cpus="$CPU_LIMIT" --memory="$MEMORY_LIMIT"  -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env REGION=${REGION} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env URL_ID=${URL_ID} $IMAGE_NAME"
 
 # 执行 docker run 命令
 eval $DOCKER_RUN_CMD
 
 # 等待容器启动完成
-sleep 5  # 等待容器内的服务启动
+sleep 15  # 等待容器内的服务启动
 
 # 提取容器内的 JSON 文件对象值并生成二维码
 echo "从容器中提取 JSON 文件对象值并生成二维码..."
