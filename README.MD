@@ -21,7 +21,7 @@ docker logs vless_reality_$URL_ID
 
 docker ps -a --format "{{.ID}} {{.Names}}" | grep  "reality" | cut -d " " -f1 | xargs -r docker stop
 
-bash start_vless_reality.sh -e URL_ID=12345679 -e PORT=23457 -e MONTHS=3 -e DAYS=10 -e REGION=TTUS 
+bash start_vless_reality.sh -e URL_ID=12345679 -e PORT=23457 -e MONTHS=3 -e DAYS=10 -e REGION=TTUS -e CPU=1
 ### 说明
 
 - **自动生成区域码**: 默认生成一个随机的 4 位字母 `REGION`，但可以通过命令行参数覆盖。

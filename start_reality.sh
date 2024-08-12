@@ -185,11 +185,25 @@ echo "######################## URL_ID: $URL_ID"
 # 启动 Docker 容器
 CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
+# 文件保存路径
+mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/log
 # 构建 docker run 命令
-# shellcheck disable=SC2027
-DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME --restart=always --log-opt max-size=50m  --cpus="$CPU_LIMIT" --memory="$MEMORY_LIMIT"  -m=300m -p $EXTERNAL_PORT:443 -e EXTERNAL_PORT=$EXTERNAL_PORT --env REGION=${REGION} --env DAY_COUNT=${DAY_COUNT} --env MONTH_COUNT=${MONTH_COUNT} --env URL_ID=${URL_ID} $IMAGE_NAME"
+# Construct the docker run command
+DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME \
+  --restart=always \
+  --log-opt max-size=50m \
+  --cpus=\"$CPU_LIMIT\" \
+  --memory=\"$MEMORY_LIMIT\" \
+  -p $EXTERNAL_PORT:443 \
+  -e EXTERNAL_PORT=$EXTERNAL_PORT \
+  --env REGION=${REGION} \
+  --env DAY_COUNT=${DAY_COUNT} \
+  --env MONTH_COUNT=${MONTH_COUNT} \
+  --env URL_ID=${URL_ID} \
+  -v /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/log:/var/log/xray \
+  $IMAGE_NAME"
 
-# 执行 docker run 命令
+# Execute the docker run command
 eval $DOCKER_RUN_CMD
 
 # 等待容器启动完成
@@ -215,16 +229,21 @@ if [[ -z "$URL_OUTPUT" ]]; then
     exit 1
 fi
 
-mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}
+# 配置文件
 docker cp ${CONTAINER_NAME}:vless_info.json /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/ > /dev/null 2>&1 && \
 docker cp ${CONTAINER_NAME}:config_info.txt /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/ > /dev/null 2>&1
 
+echo "link"
 echo "$URL_OUTPUT"
+
+echo "QR CODE"
 echo "$URL_OUTPUT" | qrencode -o - -t UTF8
 echo "$URL_OUTPUT" | qrencode -o - -t UTF8 >> /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/vless_info.json
 
 if [ $? -eq 0 ]; then
   echo "Operation completed successfully."
+  echo "run command to modify the permission of log file"
+  echo" sudo chown -R zgo:zgo /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/"
 else
   echo "Error: Operation failed."
 fi
