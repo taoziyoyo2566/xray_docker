@@ -46,7 +46,7 @@ URL_ID=$(openssl rand -hex 4 | tr -d '\n')
 PORT=$(generate_random_port)
 DAY_COUNT=""
 MONTH_COUNT=""
-REGION="TTTUS"  # Default region
+REGION="TESTUS"  # Default region
 CPU_LIMIT="0.5" # Default CPU limit (0.5 cores)
 MEMORY_LIMIT="300m" # Default memory limit (300 MB)
 
@@ -109,8 +109,8 @@ if is_port_in_use $PORT; then
 fi
 
 # Validate REGION
-if ! [[ "$REGION" =~ ^[A-Za-z]{5}$ ]]; then
-    echo "错误：参数 REGION 必须是4位英文字母。"
+if ! [[ "$REGION" =~ ^[A-Za-z]{6}$ ]]; then
+    echo "错误：参数 REGION 必须是6位英文字母。"
     exit 1
 fi
 
@@ -243,7 +243,7 @@ echo "$URL_OUTPUT" | qrencode -o - -t UTF8 >> /opt/docker/reality/nodeInfo/${CON
 if [ $? -eq 0 ]; then
   echo "Operation completed successfully."
   echo "run command to modify the permission of log file"
-  echo" sudo chown -R zgo:zgo /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/"
+  echo "sudo chown -R zgo:zgo /opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
 else
   echo "Error: Operation failed."
 fi
