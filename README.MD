@@ -37,3 +37,6 @@ bash start_vless_reality.sh -e URL_ID=12345679 -e PORT=23457 -e MONTHS=3 -e DAYS
         - `-e MEMORY=512m`：指定内存使用限制。
 
 - **资源配置**: 通过 `CPU` 和 `MEMORY` 参数来控制 Docker 容器的资源使用，确保合理利用系统资源。
+
+# monitor access
+python3 monitor.py reality_BWHSHE_96e09393 [1h|1d|1m]
