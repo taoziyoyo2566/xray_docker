@@ -2,7 +2,7 @@
 
 # Function to check if the software is installed
 # Array of software names to check
-SOFTWARE_LIST=("docker" "qrencode" "jq" "git" "curl")
+SOFTWARE_LIST=("docker" "qrencode" "jq" "git" "curl" "net-tools")
 
 # Function to check if software is installed
 check_software() {
