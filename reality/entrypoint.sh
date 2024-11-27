@@ -1,103 +1,113 @@
 #!/bin/sh
-if [ -f /config_info.txt ]; then
-  echo "config.json exist"
-else
-  IPV6=$(curl -6 -sSL --connect-timeout 3 --retry 2  ip.sb || echo "null")
-  IPV4=$(curl -4 -sSL --connect-timeout 3 --retry 2  ip.sb || echo "null")
-  if [ -z "$UUID" ]; then
-    echo "UUID is not set, generate random UUID "
-    UUID="$(/xray uuid)"
-    echo "UUID: $UUID"
-  fi
+set -e  # 当发生错误时立即退出
+set -u  # 当使用未定义的变量时退出
+set -o pipefail  # 管道中任一命令失败，则整个管道失败
 
-  if [ -z "$EXTERNAL_PORT" ]; then
-    echo "EXTERNAL_PORT is not set, use default value 443"
-    EXTERNAL_PORT=443
-  fi
+# 日志函数
+log_info() {
+    echo "[INFO] $1"
+}
 
-  if [ -n "$HOSTMODE_PORT" ];then
-    EXTERNAL_PORT=$HOSTMODE_PORT
-    jq ".inbounds[0].port=$HOSTMODE_PORT" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
-  fi
+log_warning() {
+    echo "[WARNING] $1"
+}
 
-  if [ -z "$DEST" ]; then
-    echo "DEST is not set. default value www.apple.com:443"
-    DEST="www.apple.com:443"
-  fi
+log_error() {
+    echo "[ERROR] $1"
+}
 
-  if [ -z "$SERVERNAMES" ]; then
-    echo "SERVERNAMES is not set. use default value [\"www.apple.com\",\"images.apple.com\"]"
-    SERVERNAMES="www.apple.com images.apple.com"
-  fi
+# 主函数
+main() {
+    if [ -f /config_info.txt ]; then
+        log_info "配置文件已存在，跳过初始化。"
+    else
+        IPV6=$(curl -6 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
+        IPV4=$(curl -4 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
 
-  if [ -z "$PRIVATEKEY" ]; then
-    echo "PRIVATEKEY is not set. generate new key"
-    /xray x25519 >/key
-    PRIVATEKEY=$(cat /key | grep "Private" | awk -F ': ' '{print $2}')
-    PUBLICKEY=$(cat /key | grep "Public" | awk -F ': ' '{print $2}')
-    echo "Private key: $PRIVATEKEY"
-    echo "Public key: $PUBLICKEY"
-  fi
+        UUID="${UUID:-$(/xray uuid)}"
+        log_info "UUID: $UUID"
 
-  if [ -z "$NETWORK" ]; then
-    echo "NETWORK is not set,set default value tcp"
-    NETWORK="tcp"
-  fi
+        EXTERNAL_PORT="${EXTERNAL_PORT:-443}"
+        log_info "EXTERNAL_PORT: $EXTERNAL_PORT"
 
-  if [ -z "$URL_ID" ]; then
-    echo "URL_ID is not set,set default value random"
-    URL_ID=$(openssl rand -hex 4 | tr -d '\n')
-  fi
+        DEST="${DEST:-www.apple.com:443}"
+        log_info "DEST: $DEST"
 
-   if [ -z "$REGION" ]; then
-    REGION_ID=$URL_ID
-    REGION="NA"
-    echo "region not set"
-  else
-    REGION_ID=${REGION}_${URL_ID}
-  fi
+        SERVERNAMES="${SERVERNAMES:-www.apple.com images.apple.com}"
+        log_info "SERVERNAMES: $SERVERNAMES"
 
-  CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
-  EXPIRE_DATETIME=NA
+        NETWORK="${NETWORK:-tcp}"
+        log_info "NETWORK: $NETWORK"
 
-  if [ -n "$DAY_COUNT" ] && [ -n "$MONTH_COUNT" ]; then
-    EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day +${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
-  elif [ -n "$DAY_COUNT" ]; then
-    EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day" +"%Y-%m-%d %H:%M:%S")
-  elif [ -n "$MONTH_COUNT" ]; then
-    EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
-  else
-    echo "Neither day nor month set"
-  fi
+        URL_ID="${URL_ID:-$(openssl rand -hex 4 | tr -d '\n')}"
+        log_info "URL_ID: $URL_ID"
 
-  # change config
-  jq ".inbounds[0].settings.clients[0].id=\"$UUID\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
-  jq ".inbounds[0].streamSettings.realitySettings.dest=\"$DEST\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
+        REGION="${REGION:-NA}"
+        REGION_ID="${REGION}_${URL_ID}"
 
-  SERVERNAMES_JSON_ARRAY="$(echo "[$(echo $SERVERNAMES | awk '{for(i=1;i<=NF;i++) printf "\"%s\",", $i}' | sed 's/,$//')]")"
-  jq --argjson serverNames "$SERVERNAMES_JSON_ARRAY" '.inbounds[0].streamSettings.realitySettings.serverNames = $serverNames' /config.json >/config.json_tmp && mv /config.json_tmp /config.json
+        CREATE_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
+        EXPIRE_DATETIME="NA"
 
-  jq ".inbounds[0].streamSettings.realitySettings.privateKey=\"$PRIVATEKEY\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
-  jq ".inbounds[0].streamSettings.network=\"$NETWORK\"" /config.json >/config.json_tmp && mv /config.json_tmp /config.json
+        if [ -n "${DAY_COUNT:-}" ] && [ -n "${MONTH_COUNT:-}" ]; then
+            EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day +${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
+        elif [ -n "${DAY_COUNT:-}" ]; then
+            EXPIRE_DATETIME=$(date -d "+${DAY_COUNT} day" +"%Y-%m-%d %H:%M:%S")
+        elif [ -n "${MONTH_COUNT:-}" ]; then
+            EXPIRE_DATETIME=$(date -d "+${MONTH_COUNT} month" +"%Y-%m-%d %H:%M:%S")
+        else
+            log_warning "未设置过期日期。"
+        fi
 
-  FIRST_SERVERNAME=$(echo $SERVERNAMES | awk '{print $1}')
-  # config info with green color
-  echo -e "\033[32m" >/config_info.txt
-  echo "IPV6: $IPV6" >>/config_info.txt
-  echo "IPV4: $IPV4" >>/config_info.txt
-  echo "UUID: $UUID" >>/config_info.txt
-  echo "DEST: $DEST" >>/config_info.txt
-  echo "PORT: $EXTERNAL_PORT" >>/config_info.txt
-  echo "SERVERNAMES: $SERVERNAMES (任选其一)" >>/config_info.txt
-  echo "PRIVATEKEY: $PRIVATEKEY" >>/config_info.txt
-  echo "PUBLICKEY: $PUBLICKEY" >>/config_info.txt
-  echo "NETWORK: $NETWORK" >>/config_info.txt
-  if [ "$IPV4" != "null" ]; then
-    SUB_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality"
-    URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
-    echo "IPV4 订阅连接: $SUB_IPV4" >>/config_info.txt
-    # echo -e "IPV4 订阅二维码:\n$(echo "$SUB_IPV4" | qrencode -o - -t UTF8)" >>/config_info.txt
-    cat > vless_info.json <<EOF
+        # 生成私钥和公钥
+        if [ -z "${PRIVATEKEY:-}" ]; then
+            log_info "未设置 PRIVATEKEY，生成新的密钥对。"
+            KEY_OUTPUT=$(/xray x25519)
+            PRIVATEKEY=$(echo "$KEY_OUTPUT" | grep "Private key" | awk -F ': ' '{print $2}')
+            PUBLICKEY=$(echo "$KEY_OUTPUT" | grep "Public key" | awk -F ': ' '{print $2}')
+            log_info "Private Key: $PRIVATEKEY"
+            log_info "Public Key: $PUBLICKEY"
+        fi
+
+        # 更新配置文件
+        jq --arg uuid "$UUID" \
+           --arg dest "$DEST" \
+           --argjson serverNames "$(echo "$SERVERNAMES" | jq -R 'split(" ")')" \
+           --arg privateKey "$PRIVATEKEY" \
+           --arg network "$NETWORK" \
+           '.inbounds[0].settings.clients[0].id = $uuid |
+            .inbounds[0].streamSettings.realitySettings.dest = $dest |
+            .inbounds[0].streamSettings.realitySettings.serverNames = $serverNames |
+            .inbounds[0].streamSettings.realitySettings.privateKey = $privateKey |
+            .inbounds[0].streamSettings.network = $network' /config.json > /config.json_tmp
+
+        if [ $? -ne 0 ]; then
+            log_error "更新配置文件失败。"
+            exit 1
+        fi
+
+        mv /config.json_tmp /config.json
+
+        FIRST_SERVERNAME=$(echo "$SERVERNAMES" | awk '{print $1}')
+
+        # 配置信息
+        {
+            echo "IPV6: $IPV6"
+            echo "IPV4: $IPV4"
+            echo "UUID: $UUID"
+            echo "DEST: $DEST"
+            echo "PORT: $EXTERNAL_PORT"
+            echo "SERVERNAMES: $SERVERNAMES (任选其一)"
+            echo "PRIVATEKEY: $PRIVATEKEY"
+            echo "PUBLICKEY: $PUBLICKEY"
+            echo "NETWORK: $NETWORK"
+        } > /config_info.txt
+
+        if [ "$IPV4" != "null" ]; then
+            URL_IPV4="vless://$UUID@$IPV4:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_$REGION_ID"
+            echo "IPV4 订阅连接: $URL_IPV4" >> /config_info.txt
+
+            # 生成 vless_info.json
+            cat > /vless_info.json <<EOF
 {
   "URL_ID": "$URL_ID",
   "REGION": "$REGION",
@@ -109,38 +119,42 @@ else
   "URL_IPV4": "$URL_IPV4",
   "CREATE_DATETIME": "$CREATE_DATETIME",
   "EXPIRE_DATETIME": "$EXPIRE_DATETIME",
-  "MONTH_COUNT": "$MONTH_COUNT",
-  "DAY_COUNT": "$DAY_COUNT"
+  "MONTH_COUNT": "${MONTH_COUNT:-}",
+  "DAY_COUNT": "${DAY_COUNT:-}"
 }
 EOF
-  fi
-  if [ "$IPV6" != "null" ];then
-    SUB_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#docker_vless_reality_vision_V6"
-    URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$REGION_ID"
-    echo "IPV6 订阅连接: $SUB_IPV6" >>/config_info.txt
-    #echo -e "IPV6 订阅二维码:\n$(echo "$SUB_IPV6" | qrencode -o - -t UTF8)" >>/config_info.txt
-    cat > vless_info_v6.json <<EOF
+        fi
+
+        if [ "$IPV6" != "null" ]; then
+            URL_IPV6="vless://$UUID@$IPV6:$EXTERNAL_PORT?encryption=none&security=reality&type=$NETWORK&sni=$FIRST_SERVERNAME&fp=chrome&pbk=$PUBLICKEY&flow=xtls-rprx-vision#vless_reality_V6_$REGION_ID"
+            echo "IPV6 订阅连接: $URL_IPV6" >> /config_info.txt
+
+            # 生成 vless_info_v6.json
+            cat > /vless_info_v6.json <<EOF
 {
-  "URL_ID": $URL_ID,
-  "REGION": $REGION,
-  "IPV6": "$IPV6"
+  "URL_ID": "$URL_ID",
+  "REGION": "$REGION",
+  "IPV6": "$IPV6",
   "UUID": "$UUID",
   "DEST": "$DEST",
   "PORT": "$EXTERNAL_PORT",
   "NETWORK": "$NETWORK",
   "URL_IPV6": "$URL_IPV6",
   "CREATE_DATETIME": "$CREATE_DATETIME",
-  "EXPIRE_DATETIME": "$EXPIRE_DATETIME"
-  "MONTH_COUNT": "$MONTH_COUNT",
-  "DAY_COUNT": "$DAY_COUNT"
+  "EXPIRE_DATETIME": "$EXPIRE_DATETIME",
+  "MONTH_COUNT": "${MONTH_COUNT:-}",
+  "DAY_COUNT": "${DAY_COUNT:-}"
 }
 EOF
-  fi
-  echo -e "\033[0m" >>/config_info.txt
-fi
+        fi
+    fi
 
-# show config info
-cat /config_info.txt
+    # 显示配置信息
+    cat /config_info.txt
 
-# run xray
-exec /xray -config /config.json
+    # 运行 xray
+    exec /xray -config /config.json
+}
+
+# 执行主函数
+main "$@"
