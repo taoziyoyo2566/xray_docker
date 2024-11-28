@@ -144,6 +144,29 @@ urlencode() {
     echo "${encoded}"
 }
 
+# 定义 get_country 方法
+get_country() {
+  # 获取本机外网IP地址
+  local ip=$(curl -s https://api.ipify.org)
+
+  if [ -z "$ip" ]; then
+    echo "无法获取本机外网IP地址"
+    return 1
+  fi
+
+  # 使用ipinfo.io API获取IP地址的地理位置
+  local country=$(curl -s "https://ipinfo.io/$ip" | jq -r '.country')
+
+  if [ -z "$country" ]; then
+    echo "无法获取国家信息 for IP: $ip"
+    return 1
+  fi
+
+  # 输出国家信息
+  echo "$country"
+}
+
+
 # 主函数
 main() {
     # 检查并安装必要的软件
@@ -404,17 +427,22 @@ main() {
         encoded_email=$(urlencode "$email")
         SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
 
+        # 调用 get_country 方法并打印结果
+        COUNTRY=$(get_country)
+
         # 添加到 nodeInfo.json 数据中
         node_info_json=$(jq -n \
             --arg user "$email" \
             --arg id "$uuid" \
             --arg expire "${EXPIRE_DATE:-""}" \
             --arg subscription "$SUB_LINK" \
+            --arg country "$COUNTRY" \
             '{
                 user: $user,
                 id: $id,
                 expire: $expire,
-                subscription: $subscription
+                subscription: $subscription,
+                country: $country
             }')
         NODE_INFO_LIST+=("$node_info_json")
     done
