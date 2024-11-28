@@ -1,0 +1,525 @@
+--- a/start_reality.sh
++++ b/start_reality.sh
+@@ -1,46 +1,44 @@
+ #!/bin/bash
+-set -e  # 当发生错误时立即退出
+-#set -u  # 暂时注释掉，防止因未定义变量导致脚本退出
+-set -o pipefail  # 管道中任一命令失败，则整个管道失败
+-set -x  # 启用调试模式
++#set -e
++set -o pipefail
+
+ # 日志函数
+ log_info() {
+     echo -e "\033[32m[INFO]\033[0m $1"
+ }
+
+-log_warning() {
+-    echo -e "\033[33m[WARNING]\033[0m $1"
+-}
+-
+ log_error() {
+     echo -e "\033[31m[ERROR]\033[0m $1"
+ }
+
+ # 显示帮助信息的函数
+ show_help() {
+-    echo "Usage: $0 [-u URL_ID] [-p PORT] [-r REGION] [-d DAYS] [-m MONTHS] [-c CPU_LIMIT] [-M MEMORY_LIMIT]"
++    echo "Usage: $0 -u user1@example.com,user2@example.com [options]"
+     echo
+     echo "Options:"
+-    echo "  -u URL_ID        Set the URL_ID (8 alphanumeric characters)"
++    echo "  -u USERS         Set the users (comma-separated list)"
+     echo "  -p PORT          Set the port number (5 digits, >20000)"
+     echo "  -r REGION        Set the REGION (6 uppercase letters)"
+     echo "  -d DAYS          Set the number of days"
+     echo "  -m MONTHS        Set the number of months"
+     echo "  -c CPU_LIMIT     Set the CPU limit (e.g., 0.5)"
+     echo "  -M MEMORY_LIMIT  Set the memory limit (e.g., 300m)"
++    echo "  -e EXPIRE_DATE   Set the expiration date (YYYYMMDD format)"
+     echo "  -h               Show help"
+ }
+
+-# 检查所需软件是否安装的函数
+-check_required_software() {
+-    local software_list=("docker" "qrencode" "jq" "git" "curl" "netstat")
+-    for software in "${software_list[@]}"; do
+-        if ! command -v "$software" &> /dev/null; then
+-            log_error "$software 未安装，请先安装。"
+-            exit 1
+-        else
+-            log_info "$software 已安装。"
++# 生成包含大写字母和数字的随机 URL_ID
++generate_url_id() {
++    tr -dc 'A-Z0-9' </dev/urandom | head -c8
++}
++
++# 随机生成一个不在使用中的端口号
++generate_random_port() {
++    while true; do
++        port=$((RANDOM % 45536 + 20000))
++        if [ $port -le 65535 ] && ! is_port_in_use $port; then
++            echo $port
++            return
+         fi
+     done
+ }
+@@ -55,229 +53,309 @@ is_port_in_use() {
+     fi
+ }
+
+-# 生成包含大写字母的随机 URL_ID
+-generate_url_id() {
+-    local id
+-    id=$(tr -dc 'A-Z0-9' </dev/urandom | head -c8)
+-    echo "$id"
+-}
+-
+-# 随机生成一个不在使用中的端口号
+-generate_random_port() {
+-    local port
+-    while true; do
+-        port=$((RANDOM % 45536 + 20000))
+-        if [ $port -le 65535 ] && ! is_port_in_use $port; then
+-            echo $port
+-            return
++# 检查并安装必要的软件
++check_and_install() {
++    local cmd=$1
++    local pkg=$2
++    if ! command -v "$cmd" >/dev/null 2>&1; then
++        read -p "$cmd 未安装，是否安装 $pkg？(y/n): " choice
++        if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
++            sudo apt-get update
++            sudo apt-get install -y $pkg
++        else
++            log_error "$cmd 未安装，脚本无法继续执行。"
++            exit 1
+         fi
+-    done
++    fi
+ }
+
+-# 获取最新版本号和创建时间函数
+-get_latest_version_and_time() {
+-    local base_name="$1"
+-    local latest_image_info
+-    latest_image_info=$(docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedAt}}" $base_name | sort -r | head -n 1)
+-    if [[ -z "$latest_image_info" ]]; then
+-        echo ""
++# 使用 Docker 容器生成 X25519 密钥对
++generate_x25519_keys() {
++    local CONTAINER_NAME="xray-x25519"
++
++    # 检查容器是否已经运行
++    if docker ps --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
++        log_info "密钥生成容器 '${CONTAINER_NAME}' 已经在运行。"
+     else
+-        local latest_version latest_time
+-        latest_version=$(echo $latest_image_info | awk '{print $1}' | cut -d ':' -f 2)
+-        latest_time=$(echo $latest_image_info | awk '{print $2, $3, $4, $5, $6}')
+-        echo "$latest_version $latest_time"
++        log_info "密钥生成容器 '${CONTAINER_NAME}' 不存在，正在创建..."
++        docker run -d --name "${CONTAINER_NAME}" --rm \
++            --memory="180m" --memory-swap="200m" --cpus="0.5" \
++            teddysun/xray tail -f /dev/null
++        log_info "密钥生成容器 '${CONTAINER_NAME}' 已创建。"
++        # 等待容器启动
++        sleep 2
+     fi
++
++    # 调用 Xray 容器生成 X25519 密钥对
++    # 清理非密钥输出，仅保留 "Private key:" 和 "Public key:" 行
++    local output
++    output=$(docker exec "${CONTAINER_NAME}" xray x25519 | grep -E "Private key:|Public key:")
++
++    # 提取私钥和公钥
++    PRIVATEKEY=$(echo "$output" | grep "Private key:" | awk -F': ' '{print $2}')
++    PUBLICKEY=$(echo "$output" | grep "Public key:" | awk -F': ' '{print $2}')
++
++    if [ -z "$PRIVATEKEY" ] || [ -z "$PUBLICKEY" ]; then
++        log_error "生成密钥失败。"
++        exit 1
++    fi
++
++    log_info "Private Key: $PRIVATEKEY"
++    log_info "Public Key: $PUBLICKEY"
++
++    # 停止并移除密钥生成容器
++    docker stop "${CONTAINER_NAME}" >/dev/null 2>&1
++}
++
++# 获取最新的镜像版本号
++get_latest_version() {
++    local base_name=$1
++    local versions=($(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${base_name}:" | awk -F: '{print $2}'))
++    local max_version=0
++    for ver in "${versions[@]}"; do
++        if [[ $ver =~ ^v([0-9]+)_ ]]; then
++            num=${BASH_REMATCH[1]}
++            if (( num > max_version )); then
++                max_version=$num
++            fi
++        fi
++    done
++    echo $((max_version + 1))
+ }
+
+ # 主函数
+ main() {
+-    check_required_software
++    # 检查并安装必要的软件
++    check_and_install uuidgen uuid-runtime
++    check_and_install jq jq
++    check_and_install qrencode qrencode
++    check_and_install docker docker.io
++    check_and_install netstat net-tools
++    check_and_install curl curl
+
+     # 初始化变量，设置默认值
+-    URL_ID=""
++    USERS=""
+     PORT=""
+     DAY_COUNT=""
+     MONTH_COUNT=""
+     REGION=""
+-    CPU_LIMIT="0.5" # Default CPU limit (0.5 cores)
++    CPU_LIMIT="0.5"    # Default CPU limit (0.5 cores)
+     MEMORY_LIMIT="300m" # Default memory limit (300 MB)
++    EXPIRE_DATE=""      # 用户有效期
+
+     # 使用 getopts 解析命令行参数
+-    while getopts "u:p:r:d:m:c:M:h" opt; do
+-      case $opt in
+-        u) URL_ID="$OPTARG";;
+-        p) PORT="$OPTARG";;
+-        r) REGION="$OPTARG";;
+-        d) DAY_COUNT="$OPTARG";;
+-        m) MONTH_COUNT="$OPTARG";;
+-        c) CPU_LIMIT="$OPTARG";;
+-        M) MEMORY_LIMIT="$OPTARG";;
+-        h)
+-          show_help
+-          exit 0;;
+-        *)
+-          log_error "未知的选项: -$opt"
+-          show_help
+-          exit 1;;
+-      esac
++    while getopts "u:p:r:d:m:c:M:e:h" opt; do
++        case $opt in
++            u) USERS="$OPTARG";;
++            p) PORT="$OPTARG";;
++            r) REGION="$OPTARG";;
++            d) DAY_COUNT="$OPTARG";;
++            m) MONTH_COUNT="$OPTARG";;
++            c) CPU_LIMIT="$OPTARG";;
++            M) MEMORY_LIMIT="$OPTARG";;
++            e) EXPIRE_DATE="$OPTARG";;
++            h)
++                show_help
++                exit 0;;
++            *)
++                log_error "未知的选项: -$opt"
++                show_help
++                exit 1;;
++        esac
+     done
+
+-    # 设置默认值
+-    URL_ID="${URL_ID:-$(generate_url_id)}"
+-    PORT="${PORT:-$(generate_random_port)}"
+-    REGION="${REGION:-TESTUS}"
+-
+-    # 验证 URL_ID
+-    if ! [[ "$URL_ID" =~ ^[A-Z0-9]{8}$ ]]; then
+-        log_error "参数 URL_ID 必须是8位大写英数字。"
++    # 验证 USERS
++    if [ -z "$USERS" ]; then
++        log_error "必须指定用户列表，使用 -u 参数。"
+         exit 1
+     fi
+
++    # 将 USERS 转换为数组
++    IFS=',' read -ra USER_ARRAY <<< "$USERS"
++
++    # 为每个用户生成 UUID，并构建用户 JSON 对象
++    USER_UUID_LIST=()
++    USER_INFO_LIST=()
++    for user in "${USER_ARRAY[@]}"; do
++        uuid=$(uuidgen)
++        if [ -z "$uuid" ]; then
++            log_error "生成 UUID 失败。"
++            exit 1
++        fi
++        # 如果设置了 EXPIRE_DATE，则添加到用户对象中
++        if [ -n "$EXPIRE_DATE" ]; then
++            # 验证日期格式 YYYYMMDD
++            if ! date -d "${EXPIRE_DATE}" +"%Y%m%d" &>/dev/null; then
++                log_error "无效的日期格式，请使用 YYYYMMDD 格式，例如 20231231"
++                exit 1
++            fi
++            # 将日期转换为 ISO 8601 格式
++            EXPIRE_DATE_ISO=$(date -d "${EXPIRE_DATE}" -u +"%Y-%m-%dT%H:%M:%SZ")
++            USER_UUID_LIST+=("{\"email\":\"$user\",\"id\":\"$uuid\",\"flow\":\"xtls-rprx-vision\",\"level\":0,\"alterId\":0,\"expire\":\"$EXPIRE_DATE_ISO\"}")
++        else
++            USER_UUID_LIST+=("{\"email\":\"$user\",\"id\":\"$uuid\",\"flow\":\"xtls-rprx-vision\",\"level\":0,\"alterId\":0}")
++        fi
++        # 保存用户信息，后续生成订阅链接
++        USER_INFO_LIST+=("$user|$uuid")
++    done
++
++    # 将用户列表转换为 JSON 数组字符串
++    CLIENTS_JSON=$(printf '%s\n' "${USER_UUID_LIST[@]}" | paste -sd ',' -)
++    CLIENTS_JSON="[$CLIENTS_JSON]"
++
++    # 设置其他默认值
++    URL_ID="$(generate_url_id)"
++    PORT="${PORT:-$(generate_random_port)}"
++    REGION="${REGION:-TESTUS}"
++    NETWORK="tcp"
++    DEST="www.apple.com:443"
++    SERVERNAMES="www.apple.com images.apple.com"
++
+     # 验证 PORT
+-    if ! [[ "$PORT" =~ ^[0-9]{5}$ ]] || [ "$PORT" -le 20000 ]; then
++    if ! echo "$PORT" | grep -qE '^[0-9]{5}$' || [ "$PORT" -le 20000 ]; then
+         log_error "参数 PORT 必须是5位大于20000的端口号。"
+         exit 1
+     fi
+
+-    if is_port_in_use $PORT; then
++    if is_port_in_use "$PORT"; then
+         log_error "端口号 $PORT 已在使用中。"
+         exit 1
+     fi
+
+     # 验证 REGION
+-    if ! [[ "$REGION" =~ ^[A-Z]{6}$ ]]; then
++    if ! echo "$REGION" | grep -qE '^[A-Z]{6}$'; then
+         log_error "参数 REGION 必须是6位大写英文字母。"
+         exit 1
+     fi
+
+-    log_info "URL_ID: $URL_ID"
+-    log_info "PORT: $PORT"
+-    log_info "REGION: $REGION"
++    # 设置 CONTAINER_NAME
++    CONTAINER_NAME="reality_${REGION}_${URL_ID}"
+
+-    BASE_IMAGE_NAME="reality"
+-    LATEST_INFO=$(get_latest_version_and_time $BASE_IMAGE_NAME)
++    # 创建用户配置文件目录
++    CONFIG_DIR="/opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
++    mkdir -p "${CONFIG_DIR}/log"
+
+-    if [[ -n "$LATEST_INFO" ]]; then
+-        LATEST_VERSION=$(echo $LATEST_INFO | awk '{print $1}')
+-        LATEST_TIME=$(echo $LATEST_INFO | awk '{print $2, $3, $4, $5, $6}')
+-        log_info "最新镜像版本: $LATEST_VERSION"
+-        log_info "制作时间: $LATEST_TIME"
+-    else
+-        log_warning "没有找到最新镜像的信息。"
+-    fi
++    # 将 CLIENTS_JSON 写入 users.json
++    echo "$CLIENTS_JSON" > "${CONFIG_DIR}/users.json"
+
+-    # 提示是否重新打包一个镜像
+-    read -p "是否重新打包一个镜像？(Y/N): " REPACK
+-    if [[ "$REPACK" == "Y" || "$REPACK" == "y" ]]; then
+-        NEW_VERSION="v$(date +%Y%m%d%H%M%S)"
+-        IMAGE_NAME="${BASE_IMAGE_NAME}:${NEW_VERSION}"
+-        log_info "构建新的镜像 $IMAGE_NAME ..."
+-        docker build -t $IMAGE_NAME ./reality
+-        if [[ $? -ne 0 ]]; then
+-            log_error "镜像构建失败。"
+-            exit 1
+-        fi
+-    else
+-        if [[ -z "$LATEST_VERSION" ]]; then
+-            log_error "没有可用的镜像。请先构建一个镜像。"
+-            exit 1
+-        fi
+-        IMAGE_NAME="reality:${LATEST_VERSION}"
+-        log_info "使用现有的最新镜像 $IMAGE_NAME ..."
++    # 检查 users.json 是否成功创建
++    if [ ! -f "${CONFIG_DIR}/users.json" ]; then
++        log_error "users.json 文件创建失败。"
++        exit 1
+     fi
+
+-    EXTERNAL_PORT=$PORT
+-
+-    log_info "######################## URL_ID: $URL_ID"
+-
+-    # 启动 Docker 容器
+-    CONTAINER_NAME="reality_${REGION}_${URL_ID}"
+-
+-    # 文件保存路径
+-    mkdir -p /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/log
+-
+-    # 构建 docker run 命令
++    # 显示生成的用户信息
++    log_info "已生成 users.json，内容如下："
++    cat "${CONFIG_DIR}/users.json"
++
++    # 生成密钥
++    generate_x25519_keys
++
++    # 更新配置文件
++    cp ./config.json "${CONFIG_DIR}/config.json"
++
++    # 生成 SERVERNAMES 数组
++    SERVERNAMES_JSON=$(echo "$SERVERNAMES" | jq -R 'split(" ")')
++
++    jq --argjson clients "$CLIENTS_JSON" \
++       --arg privateKey "$PRIVATEKEY" \
++       --arg dest "$DEST" \
++       --argjson serverNames "$SERVERNAMES_JSON" \
++       --arg network "$NETWORK" \
++       '.inbounds[0].settings.clients = $clients |
++        .inbounds[0].streamSettings.realitySettings.privateKey = $privateKey |
++        .inbounds[0].streamSettings.realitySettings.dest = $dest |
++        .inbounds[0].streamSettings.realitySettings.serverNames = $serverNames |
++        .inbounds[0].streamSettings.network = $network' \
++       "${CONFIG_DIR}/config.json" > "${CONFIG_DIR}/config_tmp.json" && mv "${CONFIG_DIR}/config_tmp.json" "${CONFIG_DIR}/config.json"
++
++    # 设置镜像名称
++    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
++    IMAGE_BASE_NAME="vless_reality"
++    NEW_VERSION=$(get_latest_version "$IMAGE_BASE_NAME")
++    IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
++    IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
++
++    # 构建 Docker 镜像
++    log_info "正在构建 Docker 镜像：$IMAGE_NAME"
++    docker build -t $IMAGE_NAME .
++
++    # 构建 DOCKER_RUN_CMD
+     DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME \
+       --restart=always \
+       --log-opt max-size=50m \
+       --cpus=\"$CPU_LIMIT\" \
+       --memory=\"$MEMORY_LIMIT\" \
+-      -p $EXTERNAL_PORT:443 \
+-      -e EXTERNAL_PORT=$EXTERNAL_PORT \
++      -p $PORT:443 \
++      -e EXTERNAL_PORT=$PORT \
+       --env REGION=${REGION} \
+-      --env DAY_COUNT=${DAY_COUNT} \
+-      --env MONTH_COUNT=${MONTH_COUNT} \
+       --env URL_ID=${URL_ID} \
+-      -v /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/log:/var/log/xray \
++      -v ${CONFIG_DIR}/config.json:/config.json \
++      -v ${CONFIG_DIR}/users.json:/users.json \
++      -v ${CONFIG_DIR}/log:/var/log/xray \
+       $IMAGE_NAME"
+
+     # 执行 docker run 命令
++    log_info "正在启动 Docker 容器：$CONTAINER_NAME"
+     eval $DOCKER_RUN_CMD
+
+-    # 等待容器启动并健康运行
+-    log_info "等待容器启动..."
+-    for i in {1..30}; do
+-        STATUS=$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "notfound")
+-        if [ "$STATUS" == "running" ]; then
+-            log_info "容器已启动。"
+-            break
+-        else
+-            sleep 1
+-        fi
+-    done
+-
+-    # 检查是否成功启动
+-    if [ "$STATUS" != "running" ]; then
+-        log_error "容器启动失败。"
++    # 检查容器是否启动成功
++    sleep 3
++    CONTAINER_STATUS=$(docker ps -a --filter "name=$CONTAINER_NAME" --format "{{.Status}}")
++    if [[ $CONTAINER_STATUS == *"Up"* ]]; then
++        log_info "容器 $CONTAINER_NAME 启动成功。"
++    else
++        log_error "容器 $CONTAINER_NAME 启动失败。"
++        # 输出容器日志
++        log_error "容器日志："
++        docker logs $CONTAINER_NAME
+         exit 1
+     fi
+
+-    # 等待应用程序准备就绪
++    # 等待容器内应用程序启动
+     sleep 5
+
+-    # 提取容器内的 JSON 文件对象值并生成二维码
+-    log_info "从容器中提取 JSON 文件对象值并生成二维码..."
+-
+-    # 获取容器 ID 或名称
+-    log_info "容器 ID 或名称: $CONTAINER_NAME"
+-    log_info "端口: $EXTERNAL_PORT"
++    # 从容器中提取配置信息
++    log_info "从容器中提取配置信息..."
+
+-    # 提取 JSON 对象值
+-    docker cp ${CONTAINER_NAME}:/vless_info.json /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/ > /dev/null 2>&1
+-    if [ $? -ne 0 ]; then
++    # 提取容器内的 vless_info.json
++    docker cp ${CONTAINER_NAME}:/vless_info.json "${CONFIG_DIR}/vless_info.json" > /dev/null 2>&1 || true
++    if [ ! -f "${CONFIG_DIR}/vless_info.json" ]; then
+         log_error "未能从容器中提取 vless_info.json 文件。"
+         exit 1
+     fi
+
+-    JSON_OUTPUT=$(cat /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/vless_info.json)
++    JSON_OUTPUT=$(cat "${CONFIG_DIR}/vless_info.json")
+     if [[ -z "$JSON_OUTPUT" ]]; then
+         log_error "vless_info.json 文件为空。"
+         exit 1
+     fi
+
+-    URL_OUTPUT=$(echo "$JSON_OUTPUT" | jq -r '.URL_IPV4')
+-    if [[ -z "$URL_OUTPUT" ]]; then
+-        log_error "未找到有效的 URL。"
++    IPV4=$(echo "$JSON_OUTPUT" | jq -r '.IPV4')
++    if [[ -z "$IPV4" ]]; then
++        log_error "未找到有效的 IP。"
+         exit 1
+     fi
+
+-    echo "link"
+-    echo "$URL_OUTPUT"
+-
+-    echo "QR CODE"
+-    echo "$URL_OUTPUT" | qrencode -o - -t UTF8
++    # 输出节点信息和生成二维码
++    echo "节点信息：" > "${CONFIG_DIR}/node_info.txt"
++    for user_info in "${USER_INFO_LIST[@]}"; do
++        email=$(echo "$user_info" | cut -d'|' -f1)
++        uuid=$(echo "$user_info" | cut -d'|' -f2)
++        SUB_LINK="vless://${uuid}@${IPV4}:${PORT}?encryption=none&security=reality&type=${NETWORK}&sni=www.apple.com&fp=chrome&pbk=${PUBLICKEY}&flow=xtls-rprx-vision#${email}"
++        echo "用户：$email" | tee -a "${CONFIG_DIR}/node_info.txt"
++        echo "订阅链接：" | tee -a "${CONFIG_DIR}/node_info.txt"
++        echo "$SUB_LINK" | tee -a "${CONFIG_DIR}/node_info.txt"
++        echo "$SUB_LINK" | qrencode -o "${CONFIG_DIR}/${email}_qr.png"
++        echo "二维码已保存为：${CONFIG_DIR}/${email}_qr.png"
++        echo "" | tee -a "${CONFIG_DIR}/node_info.txt"
++    done
+
+-    # 将二维码保存到文件
+-    echo "$URL_OUTPUT" | qrencode -o /opt/docker/reality/nodeInfo/${CONTAINER_NAME}/qrcode.png
++    # 显示节点信息
++    cat "${CONFIG_DIR}/node_info.txt"
+
+-    if [ $? -eq 0 ]; then
+-      log_info "操作成功完成。"
+-      log_info "运行以下命令以修改日志文件的权限："
+-      echo "sudo chown -R $(whoami):$(whoami) /opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
+-    else
+-      log_error "操作失败。"
+-    fi
++    log_info "操作成功完成。"
+ }
+
+ # 执行主函数
+-main "$@"
++main "$@"
