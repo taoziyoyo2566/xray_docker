@@ -1,5 +1,4 @@
 #!/bin/bash
-#set -e
 set -o pipefail
 
 # 日志函数
@@ -16,15 +15,16 @@ show_help() {
     echo "Usage: $0 -u user1@example.com,user2@example.com [options]"
     echo
     echo "Options:"
-    echo "  -u USERS         Set the users (comma-separated list)"
-    echo "  -p PORT          Set the port number (5 digits, >20000)"
-    echo "  -r REGION        Set the REGION (6 uppercase letters)"
-    echo "  -d DAYS          Set the number of days"
-    echo "  -m MONTHS        Set the number of months"
-    echo "  -c CPU_LIMIT     Set the CPU limit (e.g., 0.5)"
-    echo "  -M MEMORY_LIMIT  Set the memory limit (e.g., 300m)"
-    echo "  -e EXPIRE_DATE   Set the expiration date (YYYYMMDD format)"
-    echo "  -h               Show help"
+    echo "  -u USERS         设置用户列表（用逗号分隔）"
+    echo "  -p PORT          设置端口号（5位，>20000）"
+    echo "  -r REGION        设置区域标识（6位大写字母）"
+    echo "  -d DAYS          设置有效天数"
+    echo "  -m MONTHS        设置有效月数"
+    echo "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
+    echo "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
+    echo "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
+    echo "  -n DOMAIN_NAME   设置域名（例如，example.com）"
+    echo "  -h               显示帮助信息"
 }
 
 # 生成包含大写字母和数字的随机 URL_ID
@@ -87,7 +87,6 @@ generate_x25519_keys() {
     fi
 
     # 调用 Xray 容器生成 X25519 密钥对
-    # 清理非密钥输出，仅保留 "Private key:" 和 "Public key:" 行
     local output
     output=$(docker exec "${CONTAINER_NAME}" xray x25519 | grep -E "Private key:|Public key:")
 
@@ -100,11 +99,15 @@ generate_x25519_keys() {
         exit 1
     fi
 
-    log_info "Private Key: $PRIVATEKEY"
+    # 不在日志中输出私钥
+    # log_info "Private Key: $PRIVATEKEY"
     log_info "Public Key: $PUBLICKEY"
 
-    # 停止并移除密钥生成容器
-    docker stop "${CONTAINER_NAME}" >/dev/null 2>&1
+    # 设置密钥的权限
+    echo "$PRIVATEKEY" > "${CONFIG_DIR}/private.key"
+    echo "$PUBLICKEY" > "${CONFIG_DIR}/public.key"
+    chmod 600 "${CONFIG_DIR}/private.key"
+    chmod 600 "${CONFIG_DIR}/public.key"
 }
 
 # 获取最新的镜像版本号
@@ -123,6 +126,24 @@ get_latest_version() {
     echo $((max_version + 1))
 }
 
+# URL 编码函数
+urlencode() {
+    local string="${1}"
+    local strlen=${#string}
+    local encoded=""
+    local pos c o
+
+    for (( pos=0 ; pos<strlen ; pos++ )); do
+        c=${string:$pos:1}
+        case "$c" in
+            [a-zA-Z0-9.~_-]) o="$c" ;;
+            *)               printf -v o '%%%02X' "'$c"
+        esac
+        encoded+="${o}"
+    done
+    echo "${encoded}"
+}
+
 # 主函数
 main() {
     # 检查并安装必要的软件
@@ -139,12 +160,13 @@ main() {
     DAY_COUNT=""
     MONTH_COUNT=""
     REGION=""
-    CPU_LIMIT="0.5"    # Default CPU limit (0.5 cores)
-    MEMORY_LIMIT="300m" # Default memory limit (300 MB)
+    CPU_LIMIT="0.5"    # 默认 CPU 限制
+    MEMORY_LIMIT="300m" # 默认内存限制
     EXPIRE_DATE=""      # 用户有效期
+    DOMAIN_NAME=""      # 域名
 
     # 使用 getopts 解析命令行参数
-    while getopts "u:p:r:d:m:c:M:e:h" opt; do
+    while getopts "u:p:r:d:m:c:M:e:n:h" opt; do
         case $opt in
             u) USERS="$OPTARG";;
             p) PORT="$OPTARG";;
@@ -154,6 +176,7 @@ main() {
             c) CPU_LIMIT="$OPTARG";;
             M) MEMORY_LIMIT="$OPTARG";;
             e) EXPIRE_DATE="$OPTARG";;
+            n) DOMAIN_NAME="$OPTARG";;
             h)
                 show_help
                 exit 0;;
@@ -170,19 +193,32 @@ main() {
         exit 1
     fi
 
+    # 验证 DOMAIN_NAME
+    if [ -z "$DOMAIN_NAME" ]; then
+        log_error "必须指定域名，使用 -n 参数。"
+        exit 1
+    fi
+
+    # 验证 DOMAIN_NAME 是否包含非法字符
+    if echo "$DOMAIN_NAME" | grep -q '@'; then
+        log_error "域名不能包含 '@' 符号，请提供有效的域名。"
+        exit 1
+    fi
+
     # 将 USERS 转换为数组
     IFS=',' read -ra USER_ARRAY <<< "$USERS"
 
     # 为每个用户生成 UUID，并构建用户 JSON 对象
     USER_UUID_LIST=()
     USER_INFO_LIST=()
+    NODE_INFO_LIST=()
     for user in "${USER_ARRAY[@]}"; do
         uuid=$(uuidgen)
         if [ -z "$uuid" ]; then
             log_error "生成 UUID 失败。"
             exit 1
         fi
-        # 如果设置了 EXPIRE_DATE，则添加到用户对象中
+        # 验证并处理 EXPIRE_DATE
         if [ -n "$EXPIRE_DATE" ]; then
             # 验证日期格式 YYYYMMDD
             if ! date -d "${EXPIRE_DATE}" +"%Y%m%d" &>/dev/null; then
@@ -191,17 +227,30 @@ main() {
             fi
             # 将日期转换为 ISO 8601 格式
             EXPIRE_DATE_ISO=$(date -d "${EXPIRE_DATE}" -u +"%Y-%m-%dT%H:%M:%SZ")
-            USER_UUID_LIST+=("{\"email\":\"$user\",\"id\":\"$uuid\",\"flow\":\"xtls-rprx-vision\",\"level\":0,\"alterId\":0,\"expire\":\"$EXPIRE_DATE_ISO\"}")
-        else
-            USER_UUID_LIST+=("{\"email\":\"$user\",\"id\":\"$uuid\",\"flow\":\"xtls-rprx-vision\",\"level\":0,\"alterId\":0}")
         fi
-        # 保存用户信息，后续生成订阅链接
+
+        # 使用 jq 构建用户 JSON 对象
+        user_json=$(jq -n \
+            --arg email "$user" \
+            --arg uuid "$uuid" \
+            --arg flow "xtls-rprx-vision" \
+            --arg level "0" \
+            --arg alterId "0" \
+            --arg expire "${EXPIRE_DATE_ISO:-}" \
+            '{
+                email: $email,
+                id: $uuid,
+                flow: $flow,
+                level: ($level | tonumber),
+                alterId: ($alterId | tonumber)
+            } | if $expire != "" then . + { expire: $expire } else . end')
+
+        USER_UUID_LIST+=("$user_json")
         USER_INFO_LIST+=("$user|$uuid")
     done
 
     # 将用户列表转换为 JSON 数组字符串
-    CLIENTS_JSON=$(printf '%s\n' "${USER_UUID_LIST[@]}" | paste -sd ',' -)
-    CLIENTS_JSON="[$CLIENTS_JSON]"
+    CLIENTS_JSON=$(printf '%s\n' "${USER_UUID_LIST[@]}" | jq -s '.')
 
     # 设置其他默认值
     URL_ID="$(generate_url_id)"
@@ -244,29 +293,46 @@ main() {
         exit 1
     fi
 
+    # 设置文件权限
+    chmod 600 "${CONFIG_DIR}/users.json"
+
     # 显示生成的用户信息
     log_info "已生成 users.json，内容如下："
-    cat "${CONFIG_DIR}/users.json"
+    cat "${CONFIG_DIR}/users.json" | jq .
 
     # 生成密钥
     generate_x25519_keys
 
     # 更新配置文件
     cp ./config.json "${CONFIG_DIR}/config.json"
+    chmod 600 "${CONFIG_DIR}/config.json"
 
     # 生成 SERVERNAMES 数组
     SERVERNAMES_JSON=$(echo "$SERVERNAMES" | jq -R 'split(" ")')
 
+    # 生成随机的 shortId（16个十六进制字符，代表8字节）
+    SHORTID=$(head -c8 /dev/urandom | xxd -ps -c8)
+
+    # 设置 SNI 和指纹
+    SNI="www.apple.com"
+    FINGERPRINT="chrome"
+
+    # 添加 flow 参数
+    FLOW="xtls-rprx-vision"
+
+    # 更新配置文件中的参数
     jq --argjson clients "$CLIENTS_JSON" \
        --arg privateKey "$PRIVATEKEY" \
        --arg dest "$DEST" \
        --argjson serverNames "$SERVERNAMES_JSON" \
        --arg network "$NETWORK" \
+       --arg shortId "$SHORTID" \
        '.inbounds[0].settings.clients = $clients |
         .inbounds[0].streamSettings.realitySettings.privateKey = $privateKey |
         .inbounds[0].streamSettings.realitySettings.dest = $dest |
         .inbounds[0].streamSettings.realitySettings.serverNames = $serverNames |
-        .inbounds[0].streamSettings.network = $network' \
+        .inbounds[0].streamSettings.network = $network |
+        .inbounds[0].streamSettings.realitySettings.shortIds = [$shortId]' \
        "${CONFIG_DIR}/config.json" > "${CONFIG_DIR}/config_tmp.json" && mv "${CONFIG_DIR}/config_tmp.json" "${CONFIG_DIR}/config.json"
 
     # 设置镜像名称
@@ -276,28 +342,43 @@ main() {
     IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
     IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
 
-    # 构建 Docker 镜像
-    log_info "正在构建 Docker 镜像：$IMAGE_NAME"
-    docker build -t $IMAGE_NAME .
+    # 添加构建 Docker 镜像的提示
+    read -p "是否生成新的 Docker 镜像？(y/n): " build_choice
+    if [ "$build_choice" = "y" ] || [ "$build_choice" = "Y" ]; then
+        # 构建 Docker 镜像
+        log_info "正在构建 Docker 镜像：$IMAGE_NAME"
+        docker build -t $IMAGE_NAME .
+    else
+        log_info "跳过 Docker 镜像构建，使用现有镜像。"
+        # 使用最新的已存在的镜像
+        EXISTING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE_NAME}:" | head -n1)
+        if [ -z "$EXISTING_IMAGE" ]; then
+            log_error "没有找到现有的镜像，请先构建一个。"
+            exit 1
+        else
+            IMAGE_NAME="$EXISTING_IMAGE"
+            log_info "使用现有的镜像：$IMAGE_NAME"
+        fi
+    fi
 
     # 构建 DOCKER_RUN_CMD
-    DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME \
+    DOCKER_RUN_CMD=(docker run -d --name "$CONTAINER_NAME" \
       --restart=always \
       --log-opt max-size=50m \
-      --cpus=\"$CPU_LIMIT\" \
-      --memory=\"$MEMORY_LIMIT\" \
-      -p $PORT:443 \
-      -e EXTERNAL_PORT=$PORT \
-      --env REGION=${REGION} \
-      --env URL_ID=${URL_ID} \
-      -v ${CONFIG_DIR}/config.json:/config.json \
-      -v ${CONFIG_DIR}/users.json:/users.json \
-      -v ${CONFIG_DIR}/log:/var/log/xray \
-      $IMAGE_NAME"
+      --cpus="$CPU_LIMIT" \
+      --memory="$MEMORY_LIMIT" \
+      -p "$PORT:443" \
+      -e EXTERNAL_PORT="$PORT" \
+      --env REGION="$REGION" \
+      --env URL_ID="$URL_ID" \
+      -v "${CONFIG_DIR}/config.json:/config.json:ro" \
+      -v "${CONFIG_DIR}/users.json:/users.json:ro" \
+      -v "${CONFIG_DIR}/log:/var/log/xray" \
+      "$IMAGE_NAME")
 
     # 执行 docker run 命令
     log_info "正在启动 Docker 容器：$CONTAINER_NAME"
-    eval $DOCKER_RUN_CMD
+    "${DOCKER_RUN_CMD[@]}"
 
     # 检查容器是否启动成功
     sleep 3
@@ -315,46 +396,76 @@ main() {
     # 等待容器内应用程序启动
     sleep 5
 
-    # 从容器中提取配置信息
-    log_info "从容器中提取配置信息..."
-
-    # 提取容器内的 vless_info.json
-    docker cp ${CONTAINER_NAME}:/vless_info.json "${CONFIG_DIR}/vless_info.json" > /dev/null 2>&1 || true
-    if [ ! -f "${CONFIG_DIR}/vless_info.json" ]; then
-        log_error "未能从容器中提取 vless_info.json 文件。"
-        exit 1
-    fi
-
-    JSON_OUTPUT=$(cat "${CONFIG_DIR}/vless_info.json")
-    if [[ -z "$JSON_OUTPUT" ]]; then
-        log_error "vless_info.json 文件为空。"
-        exit 1
-    fi
-
-    IPV4=$(echo "$JSON_OUTPUT" | jq -r '.IPV4')
-    if [[ -z "$IPV4" ]]; then
-        log_error "未找到有效的 IP。"
-        exit 1
-    fi
-
-    # 输出节点信息和生成二维码
-    echo "节点信息：" > "${CONFIG_DIR}/node_info.txt"
+    # 生成订阅链接并构建 nodeInfo.json
+    NODE_INFO_LIST=()
     for user_info in "${USER_INFO_LIST[@]}"; do
         email=$(echo "$user_info" | cut -d'|' -f1)
         uuid=$(echo "$user_info" | cut -d'|' -f2)
-        SUB_LINK="vless://${uuid}@${IPV4}:${PORT}?encryption=none&security=reality&type=${NETWORK}&sni=www.apple.com&fp=chrome&pbk=${PUBLICKEY}&flow=xtls-rprx-vision#${email}"
-        echo "用户：$email" | tee -a "${CONFIG_DIR}/node_info.txt"
-        echo "订阅链接：" | tee -a "${CONFIG_DIR}/node_info.txt"
-        echo "$SUB_LINK" | tee -a "${CONFIG_DIR}/node_info.txt"
-        echo "$SUB_LINK" | qrencode -o "${CONFIG_DIR}/${email}_qr.png"
-        echo "二维码已保存为：${CONFIG_DIR}/${email}_qr.png"
-        echo "" | tee -a "${CONFIG_DIR}/node_info.txt"
+        encoded_email=$(urlencode "$email")
+        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
+
+        # 添加到 nodeInfo.json 数据中
+        node_info_json=$(jq -n \
+            --arg user "$email" \
+            --arg id "$uuid" \
+            --arg expire "${EXPIRE_DATE:-""}" \
+            --arg subscription "$SUB_LINK" \
+            '{
+                user: $user,
+                id: $id,
+                expire: $expire,
+                subscription: $subscription
+            }')
+        NODE_INFO_LIST+=("$node_info_json")
     done
 
-    # 显示节点信息
-    cat "${CONFIG_DIR}/node_info.txt"
+    # 生成 nodeInfo.json 文件
+    NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
+    echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/nodeInfo.json"
+
+    log_info "已生成 nodeInfo.json，内容如下："
+    jq . "${CONFIG_DIR}/nodeInfo.json"
+
+    # 设置文件权限
+    chmod 600 "${CONFIG_DIR}/nodeInfo.json"
+
+    # 输出节点信息和生成二维码
+    display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
 
     log_info "操作成功完成。"
+}
+
+# 显示节点信息并生成二维码的函数
+display_node_info_with_qr() {
+    local node_info_file="$1"
+
+    if [ ! -f "$node_info_file" ]; then
+        log_error "文件 $node_info_file 不存在。"
+        exit 1
+    fi
+
+    # 使用 jq 格式化输出 nodeInfo.json
+    log_info "以下是 nodeInfo.json 的内容："
+    jq . "$node_info_file"
+
+    # 遍历 JSON 文件，逐个用户输出二维码
+    local users
+    users=$(jq -c '.[]' "$node_info_file")
+    for user in $users; do
+        local email
+        local sub_link
+
+        email=$(echo "$user" | jq -r '.user')
+        sub_link=$(echo "$user" | jq -r '.subscription')
+
+        echo "用户: $email"
+        echo "订阅链接: $sub_link"
+
+        # 使用 qrencode 输出二维码到控制台
+        qrencode -t ANSIUTF8 "$sub_link"
+
+        echo
+    done
 }
 
 # 执行主函数
