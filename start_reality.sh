@@ -451,6 +451,16 @@ main() {
     NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
     echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/nodeInfo.json"
 
+    # 将 nodeInfo.json 拷贝到容器根目录
+    docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
+
+    # 检查是否成功拷贝
+    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
+        log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
+    else
+        log_error "将 nodeInfo.json 拷贝到容器失败。"
+        exit 1
+    fi
     log_info "已生成 nodeInfo.json，内容如下："
     jq . "${CONFIG_DIR}/nodeInfo.json"
 
