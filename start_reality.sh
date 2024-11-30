@@ -103,11 +103,13 @@ generate_x25519_keys() {
     # log_info "Private Key: $PRIVATEKEY"
     log_info "Public Key: $PUBLICKEY"
 
-    # 设置密钥的权限
-    echo "$PRIVATEKEY" > "${CONFIG_DIR}/private.key"
-    echo "$PUBLICKEY" > "${CONFIG_DIR}/public.key"
-    chmod 600 "${CONFIG_DIR}/private.key"
-    chmod 600 "${CONFIG_DIR}/public.key"
+    # 使用临时容器将密钥写入共享卷
+    docker run --rm \
+        -v shared-data:/node-data \
+        -v "${CONFIG_DIR}:/config" \
+        busybox sh -c "echo '$PRIVATEKEY' > /node-data/private.key && echo '$PUBLICKEY' > /node-data/public.key && chmod 600 /node-data/private.key /node-data/public.key"
+
+    log_info "密钥已保存到共享卷中的 /node-data 目录。"
 }
 
 # 获取最新的镜像版本号
@@ -303,7 +305,7 @@ main() {
     # 设置 CONTAINER_NAME
     CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
-    # 创建用户配置文件目录
+    # 创建临时配置目录
     CONFIG_DIR="/opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
     mkdir -p "${CONFIG_DIR}/log"
 
@@ -345,13 +347,11 @@ main() {
 
     # 更新配置文件中的参数
     jq --argjson clients "$CLIENTS_JSON" \
-       --arg privateKey "$PRIVATEKEY" \
        --arg dest "$DEST" \
        --argjson serverNames "$SERVERNAMES_JSON" \
        --arg network "$NETWORK" \
        --arg shortId "$SHORTID" \
        '.inbounds[0].settings.clients = $clients |
-        .inbounds[0].streamSettings.realitySettings.privateKey = $privateKey |
         .inbounds[0].streamSettings.realitySettings.dest = $dest |
         .inbounds[0].streamSettings.realitySettings.serverNames = $serverNames |
         .inbounds[0].streamSettings.network = $network |
@@ -384,6 +384,12 @@ main() {
         fi
     fi
 
+    # 使用临时容器将配置文件复制到共享卷
+    docker run --rm \
+        -v shared-data:/node-data \
+        -v "${CONFIG_DIR}:/config" \
+        busybox sh -c "cp /config/config.json /node-data/ && cp /config/users.json /node-data/ && cp /config/nodeInfo.json /node-data/ && cp -r /config/log /node-data/"
+
     # 构建 DOCKER_RUN_CMD
     DOCKER_RUN_CMD=(docker run -d --name "$CONTAINER_NAME" \
       --restart=always \
@@ -394,9 +400,7 @@ main() {
       -e EXTERNAL_PORT="$PORT" \
       --env REGION="$REGION" \
       --env URL_ID="$URL_ID" \
-      -v "${CONFIG_DIR}/config.json:/config.json:ro" \
-      -v "${CONFIG_DIR}/users.json:/users.json:ro" \
-      -v "${CONFIG_DIR}/log:/var/log/xray" \
+      -v shared-data:/node-data \
       "$IMAGE_NAME")
 
     # 执行 docker run 命令
@@ -425,7 +429,7 @@ main() {
         email=$(echo "$user_info" | cut -d'|' -f1)
         uuid=$(echo "$user_info" | cut -d'|' -f2)
         encoded_email=$(urlencode "$email")
-        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
+        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=$(docker run --rm -v shared-data:/node-data busybox cat /node-data/public.key)&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
 
         # 调用 get_country 方法并打印结果
         COUNTRY=$(get_country)
@@ -449,23 +453,30 @@ main() {
 
     # 生成 nodeInfo.json 文件
     NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
+
+    # 使用临时容器将 nodeInfo.json 写入共享卷
     echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/nodeInfo.json"
+    docker run --rm \
+        -v shared-data:/node-data \
+        -v "${CONFIG_DIR}:/config" \
+        busybox sh -c "cp /config/nodeInfo.json /node-data/ && chmod 600 /node-data/nodeInfo.json"
 
-    # 将 nodeInfo.json 拷贝到容器根目录
-    docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
+    # 将 nodeInfo.json 拷贝到容器根目录（已通过共享卷完成，此步可省略）
+    # docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
 
-    # 检查是否成功拷贝
-    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
-        log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
-    else
-        log_error "将 nodeInfo.json 拷贝到容器失败。"
-        exit 1
-    fi
+    # 检查是否成功拷贝（已通过共享卷完成，此步可省略）
+    # if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
+    #     log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
+    # else
+    #     log_error "将 nodeInfo.json 拷贝到容器失败。"
+    #     exit 1
+    # fi
+
     log_info "已生成 nodeInfo.json，内容如下："
-    jq . "${CONFIG_DIR}/nodeInfo.json"
+    echo "$NODE_INFO_JSON" | jq .
 
-    # 设置文件权限
-    chmod 600 "${CONFIG_DIR}/nodeInfo.json"
+    # 设置文件权限（已在共享卷中设置）
+    # chmod 600 "${CONFIG_DIR}/nodeInfo.json"
 
     # 输出节点信息和生成二维码
     display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
