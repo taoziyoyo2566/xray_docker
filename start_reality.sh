@@ -24,7 +24,7 @@ show_help() {
     echo "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
     echo "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
     echo "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
-    echo "  -n DOMAIN_NAME   设置域名（例如，example.com）"
+    echo "  -n PREFIX        设置前缀，用于生成区域标识和域名"
     echo "  -f CONFIG_FILE   指定 JSON 配置文件"
     echo "  -h               显示帮助信息"
 }
@@ -238,7 +238,7 @@ main() {
     CPU_LIMIT="0.5"    # 默认 CPU 限制
     MEMORY_LIMIT="300m" # 默认内存限制
     EXPIRE_DATE=""      # 用户有效期
-    DOMAIN_NAME=""      # 域名
+    PREFIX=""           # 前缀，用于生成区域标识和域名
     URL_ID=""           # URL ID, 默认为空
     CONFIG_FILE=""
     DIRECTORY=""
@@ -249,13 +249,13 @@ main() {
             u) USERS="$OPTARG";;
             i) URL_ID="$OPTARG";;
             p) PORT="$OPTARG";;
-            r) REGION="$OPTARG";;
+            r) REGION_OVERRIDE="$OPTARG";;
             d) DIRECTORY="$OPTARG";;
             m) MONTH_COUNT="$OPTARG";;
             c) CPU_LIMIT="$OPTARG";;
             M) MEMORY_LIMIT="$OPTARG";;
             e) EXPIRE_DATE="$OPTARG";;
-            n) DOMAIN_NAME="$OPTARG";;
+            n) PREFIX="$OPTARG";;
             f) CONFIG_FILE="$OPTARG";;
             h)
                 show_help
@@ -340,31 +340,34 @@ process_config_file() {
     PORT=$(jq -r '.p' "$CONFIG_FILE")
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
-    REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
-    DOMAIN_NAME_VAR=$(jq -r '.n' "$CONFIG_FILE")
-    local DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+    REGION_SUFFIX=$(jq -r '.r' "$CONFIG_FILE")
+    DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
 
-    # 如果命令行没有提供 DOMAIN_NAME，从配置文件获取
-    if [ -z "$DOMAIN_NAME" ]; then
-        DOMAIN_NAME="${DOMAIN_NAME_VAR}${DOMAIN_SUFFIX}"
+    # 如果命令行没有提供 PREFIX，则报错
+    if [ -z "$PREFIX" ]; then
+        log_error "必须指定前缀，使用 -n 参数。"
+        exit 1
+    fi
+
+    # 将 PREFIX 转换为大写
+    PREFIX_UPPER=$(echo "$PREFIX" | tr '[:lower:]' '[:upper:]')
+
+    # 生成 REGION
+    if [ -n "$REGION_OVERRIDE" ]; then
+        REGION="$REGION_OVERRIDE"
+    elif [ -n "$REGION_SUFFIX" ] && [ "$REGION_SUFFIX" != "null" ]; then
+        REGION="${PREFIX_UPPER}${REGION_SUFFIX}"
     else
-        DOMAIN_NAME="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
+        log_error "必须在 JSON 文件中指定 'r' 字段，或者使用 -r 参数指定 REGION。"
+        exit 1
     fi
 
-    # 如果命令行没有提供 REGION，从配置文件获取
-    if [ -z "$REGION" ]; then
-        REGION="$REGION_VAR"
-    fi
+    # 生成 DOMAIN_NAME
+    DOMAIN_NAME="${PREFIX}${DOMAIN_SUFFIX}"
 
     # 验证 USERS
     if [ -z "$USERS" ]; then
         log_error "必须指定用户列表，使用 -u 参数或在配置文件中指定。"
-        exit 1
-    fi
-
-    # 验证 DOMAIN_NAME
-    if [ -z "$DOMAIN_NAME" ]; then
-        log_error "必须指定域名，使用 -n 参数或在配置文件中指定。"
         exit 1
     fi
 
@@ -434,7 +437,6 @@ process_config_file() {
         # 如果没有指定 URL_ID，生成一个
         URL_ID=$(generate_url_id)
     fi
-    REGION="${REGION:-TESTUS}"
     NETWORK="tcp"
     DEST="www.apple.com:443"
     SERVERNAMES="www.apple.com images.apple.com"

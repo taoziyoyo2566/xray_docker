@@ -4,3 +4,6 @@ bash start_reality.sh -u taoziyoyo@taoziyoyo.com -r ALPSHA -p 50199 -i KCL2EJQ1 
 bash start_reality.sh -f taoziyoyo.json -n alp
 
 bash start_reality.sh -n alp -d client
+
+
+docker rm $(docker ps -a --filter "name=^reality_" -q)
