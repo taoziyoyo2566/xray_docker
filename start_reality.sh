@@ -62,6 +62,10 @@ check_and_install() {
         if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
             sudo apt-get update
             sudo apt-get install -y $pkg
+            if [ $? -ne 0 ]; then
+                log_error "安装 $pkg 失败。"
+                exit 1
+            fi
         else
             log_error "$cmd 未安装，脚本无法继续执行。"
             exit 1
@@ -81,6 +85,10 @@ generate_x25519_keys() {
         docker run -d --name "${CONTAINER_NAME}" --rm \
             --memory="180m" --memory-swap="200m" --cpus="0.5" \
             teddysun/xray tail -f /dev/null
+        if [ $? -ne 0 ]; then
+            log_error "无法创建密钥生成容器 '${CONTAINER_NAME}'。"
+            exit 1
+        fi
         log_info "密钥生成容器 '${CONTAINER_NAME}' 已创建。"
         # 等待容器启动
         sleep 2
@@ -89,6 +97,10 @@ generate_x25519_keys() {
     # 调用 Xray 容器生成 X25519 密钥对
     local output
     output=$(docker exec "${CONTAINER_NAME}" xray x25519 | grep -E "Private key:|Public key:")
+    if [ $? -ne 0 ]; then
+        log_error "无法在容器内生成密钥。"
+        exit 1
+    fi
 
     # 提取私钥和公钥
     PRIVATEKEY=$(echo "$output" | grep "Private key:" | awk -F': ' '{print $2}')
@@ -103,13 +115,13 @@ generate_x25519_keys() {
     # log_info "Private Key: $PRIVATEKEY"
     log_info "Public Key: $PUBLICKEY"
 
-    # 使用临时容器将密钥写入共享卷
-    docker run --rm \
-        -v shared-data:/node-data \
-        -v "${CONFIG_DIR}:/config" \
-        busybox sh -c "echo '$PRIVATEKEY' > /node-data/private.key && echo '$PUBLICKEY' > /node-data/public.key && chmod 600 /node-data/private.key /node-data/public.key"
+    # 设置密钥的权限并保存到 CONFIG_DIR
+    echo "$PRIVATEKEY" > "${CONFIG_DIR}/private.key"
+    echo "$PUBLICKEY" > "${CONFIG_DIR}/public.key"
+    chmod 600 "${CONFIG_DIR}/private.key"
+    chmod 600 "${CONFIG_DIR}/public.key"
 
-    log_info "密钥已保存到共享卷中的 /node-data 目录。"
+    log_info "密钥已保存到 ${CONFIG_DIR} 目录。"
 }
 
 # 获取最新的镜像版本号
@@ -167,7 +179,6 @@ get_country() {
   # 输出国家信息
   echo "$country"
 }
-
 
 # 主函数
 main() {
@@ -305,7 +316,7 @@ main() {
     # 设置 CONTAINER_NAME
     CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
-    # 创建临时配置目录
+    # 创建用户配置文件目录
     CONFIG_DIR="/opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
     mkdir -p "${CONFIG_DIR}/log"
 
@@ -347,11 +358,13 @@ main() {
 
     # 更新配置文件中的参数
     jq --argjson clients "$CLIENTS_JSON" \
+       --arg privateKey "$PRIVATEKEY" \
        --arg dest "$DEST" \
        --argjson serverNames "$SERVERNAMES_JSON" \
        --arg network "$NETWORK" \
        --arg shortId "$SHORTID" \
        '.inbounds[0].settings.clients = $clients |
+        .inbounds[0].streamSettings.realitySettings.privateKey = $privateKey |
         .inbounds[0].streamSettings.realitySettings.dest = $dest |
         .inbounds[0].streamSettings.realitySettings.serverNames = $serverNames |
         .inbounds[0].streamSettings.network = $network |
@@ -370,7 +383,11 @@ main() {
     if [ "$build_choice" = "y" ] || [ "$build_choice" = "Y" ]; then
         # 构建 Docker 镜像
         log_info "正在构建 Docker 镜像：$IMAGE_NAME"
-        docker build -t $IMAGE_NAME .
+        docker build -t "$IMAGE_NAME" .
+        if [ $? -ne 0 ]; then
+            log_error "Docker 镜像构建失败。"
+            exit 1
+        fi
     else
         log_info "跳过 Docker 镜像构建，使用现有镜像。"
         # 使用最新的已存在的镜像
@@ -384,12 +401,6 @@ main() {
         fi
     fi
 
-    # 使用临时容器将配置文件复制到共享卷
-    docker run --rm \
-        -v shared-data:/node-data \
-        -v "${CONFIG_DIR}:/config" \
-        busybox sh -c "cp /config/config.json /node-data/ && cp /config/users.json /node-data/ && cp /config/nodeInfo.json /node-data/ && cp -r /config/log /node-data/"
-
     # 构建 DOCKER_RUN_CMD
     DOCKER_RUN_CMD=(docker run -d --name "$CONTAINER_NAME" \
       --restart=always \
@@ -400,12 +411,18 @@ main() {
       -e EXTERNAL_PORT="$PORT" \
       --env REGION="$REGION" \
       --env URL_ID="$URL_ID" \
-      -v shared-data:/node-data \
+      -v "${CONFIG_DIR}/config.json:/config.json:ro" \
+      -v "${CONFIG_DIR}/users.json:/users.json:ro" \
+      -v "${CONFIG_DIR}/log:/var/log/xray" \
       "$IMAGE_NAME")
 
     # 执行 docker run 命令
     log_info "正在启动 Docker 容器：$CONTAINER_NAME"
     "${DOCKER_RUN_CMD[@]}"
+    if [ $? -ne 0 ]; then
+        log_error "启动 Docker 容器失败。"
+        exit 1
+    fi
 
     # 检查容器是否启动成功
     sleep 3
@@ -416,7 +433,7 @@ main() {
         log_error "容器 $CONTAINER_NAME 启动失败。"
         # 输出容器日志
         log_error "容器日志："
-        docker logs $CONTAINER_NAME
+        docker logs "$CONTAINER_NAME"
         exit 1
     fi
 
@@ -429,7 +446,7 @@ main() {
         email=$(echo "$user_info" | cut -d'|' -f1)
         uuid=$(echo "$user_info" | cut -d'|' -f2)
         encoded_email=$(urlencode "$email")
-        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=$(docker run --rm -v shared-data:/node-data busybox cat /node-data/public.key)&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
+        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
 
         # 调用 get_country 方法并打印结果
         COUNTRY=$(get_country)
@@ -438,7 +455,7 @@ main() {
         node_info_json=$(jq -n \
             --arg user "$email" \
             --arg id "$uuid" \
-            --arg expire "${EXPIRE_DATE:-""}" \
+            --arg expire "${EXPIRE_DATE_ISO:-}" \
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
             '{
@@ -453,30 +470,50 @@ main() {
 
     # 生成 nodeInfo.json 文件
     NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
-
-    # 使用临时容器将 nodeInfo.json 写入共享卷
     echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/nodeInfo.json"
+
+    # 验证 nodeInfo.json 是否成功创建
+    if [ ! -s "${CONFIG_DIR}/nodeInfo.json" ]; then
+        log_error "nodeInfo.json 文件创建失败或为空。"
+        exit 1
+    fi
+    log_info "nodeInfo.json 文件已成功创建。"
+
+    # 将 nodeInfo.json 拷贝到容器根目录
+    docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
+    if [ $? -ne 0 ]; then
+        log_error "将 nodeInfo.json 拷贝到容器失败。"
+        exit 1
+    fi
+
+    # 检查是否成功拷贝
+    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
+        log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
+    else
+        log_error "将 nodeInfo.json 拷贝到容器失败。"
+        exit 1
+    fi
+
+    log_info "已生成 nodeInfo.json，内容如下："
+    jq . "${CONFIG_DIR}/nodeInfo.json"
+
+    # 设置文件权限
+    chmod 600 "${CONFIG_DIR}/nodeInfo.json"
+
+    # 新增：将 nodeInfo.json 放入共享卷的 node-info/实例名/ 目录中
     docker run --rm \
         -v shared-data:/node-data \
         -v "${CONFIG_DIR}:/config" \
-        busybox sh -c "cp /config/nodeInfo.json /node-data/ && chmod 600 /node-data/nodeInfo.json"
+        busybox sh -c "mkdir -p /node-data/node-info/${CONTAINER_NAME} && cp /config/nodeInfo.json /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json && chmod 600 /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json"
 
-    # 将 nodeInfo.json 拷贝到容器根目录（已通过共享卷完成，此步可省略）
-    # docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
-
-    # 检查是否成功拷贝（已通过共享卷完成，此步可省略）
-    # if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
-    #     log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
-    # else
-    #     log_error "将 nodeInfo.json 拷贝到容器失败。"
-    #     exit 1
-    # fi
-
-    log_info "已生成 nodeInfo.json，内容如下："
-    echo "$NODE_INFO_JSON" | jq .
-
-    # 设置文件权限（已在共享卷中设置）
-    # chmod 600 "${CONFIG_DIR}/nodeInfo.json"
+    # 验证复制是否成功
+    docker run --rm -v shared-data:/node-data busybox sh -c "test -f /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json"
+    if [ $? -eq 0 ]; then
+        log_info "nodeInfo.json 已成功复制到共享卷的 node-info/${CONTAINER_NAME}/ 目录。"
+    else
+        log_error "将 nodeInfo.json 复制到共享卷失败。"
+        exit 1
+    fi
 
     # 输出节点信息和生成二维码
     display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
