@@ -1,25 +1,25 @@
 #!/bin/bash
 set -o pipefail
 
-# 日志函数
+# 日志函数，将输出重定向到标准错误
 log_info() {
-    echo -e "\033[32m[INFO]\033[0m $1"
+    echo -e "\033[32m[INFO]\033[0m $1" >&2
 }
 
 log_error() {
-    echo -e "\033[31m[ERROR]\033[0m $1"
+    echo -e "\033[31m[ERROR]\033[0m $1" >&2
 }
 
 # 显示帮助信息的函数
 show_help() {
-    echo "Usage: $0 -u user1@example.com,user2@example.com [options]"
+    echo "Usage: $0 [options]"
     echo
     echo "Options:"
     echo "  -u USERS         设置用户列表（用逗号分隔）"
     echo "  -p PORT          设置端口号（5位，>20000）"
     echo "  -i URL_ID        指定 URL ID（8位大写字母和数字）"
     echo "  -r REGION        设置区域标识（6位大写字母）"
-    echo "  -d DAYS          设置有效天数"
+    echo "  -d DIRECTORY     指定包含 JSON 配置文件的目录"
     echo "  -m MONTHS        设置有效月数"
     echo "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
     echo "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
@@ -77,6 +77,7 @@ check_and_install() {
 
 # 使用 Docker 容器生成 X25519 密钥对
 generate_x25519_keys() {
+    local CONFIG_DIR="$1"
     local CONTAINER_NAME="xray-x25519"
 
     # 检查容器是否已经运行
@@ -105,6 +106,8 @@ generate_x25519_keys() {
     fi
 
     # 提取私钥和公钥
+    local PRIVATEKEY
+    local PUBLICKEY
     PRIVATEKEY=$(echo "$output" | grep "Private key:" | awk -F': ' '{print $2}')
     PUBLICKEY=$(echo "$output" | grep "Public key:" | awk -F': ' '{print $2}')
 
@@ -114,7 +117,6 @@ generate_x25519_keys() {
     fi
 
     # 不在日志中输出私钥
-    # log_info "Private Key: $PRIVATEKEY"
     log_info "Public Key: $PUBLICKEY"
 
     # 设置密钥的权限并保存到 CONFIG_DIR
@@ -124,6 +126,9 @@ generate_x25519_keys() {
     chmod 600 "${CONFIG_DIR}/public.key"
 
     log_info "密钥已保存到 ${CONFIG_DIR} 目录。"
+
+    # 返回私钥和公钥
+    echo "$PRIVATEKEY|$PUBLICKEY"
 }
 
 # 获取最新的镜像版本号
@@ -182,6 +187,39 @@ get_country() {
   echo "$country"
 }
 
+# 显示节点信息并生成二维码的函数
+display_node_info_with_qr() {
+    local node_info_file="$1"
+
+    if [ ! -f "$node_info_file" ]; then
+        log_error "文件 $node_info_file 不存在。"
+        exit 1
+    fi
+
+    # 使用 jq 格式化输出 nodeInfo.json
+    log_info "以下是 nodeInfo.json 的内容："
+    jq . "$node_info_file"
+
+    # 遍历 JSON 文件，逐个用户输出二维码
+    local users
+    users=$(jq -c '.[]' "$node_info_file")
+    for user in $users; do
+        local email
+        local sub_link
+
+        email=$(echo "$user" | jq -r '.user')
+        sub_link=$(echo "$user" | jq -r '.subscription')
+
+        echo "用户: $email"
+        echo "订阅链接: $sub_link"
+
+        # 使用 qrencode 输出二维码到控制台
+        qrencode -t ANSIUTF8 "$sub_link"
+
+        echo
+    done
+}
+
 # 主函数
 main() {
     # 检查并安装必要的软件
@@ -195,7 +233,6 @@ main() {
     # 初始化变量，设置默认值
     USERS=""
     PORT=""
-    DAY_COUNT=""
     MONTH_COUNT=""
     REGION=""
     CPU_LIMIT="0.5"    # 默认 CPU 限制
@@ -203,6 +240,8 @@ main() {
     EXPIRE_DATE=""      # 用户有效期
     DOMAIN_NAME=""      # 域名
     URL_ID=""           # URL ID, 默认为空
+    CONFIG_FILE=""
+    DIRECTORY=""
 
     # 使用 getopts 解析命令行参数
     while getopts "u:i:p:r:d:m:c:M:e:n:f:h" opt; do
@@ -211,7 +250,7 @@ main() {
             i) URL_ID="$OPTARG";;
             p) PORT="$OPTARG";;
             r) REGION="$OPTARG";;
-            d) DAY_COUNT="$OPTARG";;
+            d) DIRECTORY="$OPTARG";;
             m) MONTH_COUNT="$OPTARG";;
             c) CPU_LIMIT="$OPTARG";;
             M) MEMORY_LIMIT="$OPTARG";;
@@ -228,26 +267,104 @@ main() {
         esac
     done
 
-    if [ -n "$CONFIG_FILE" ]; then
-        # 解析 JSON 文件
-        USERS=$(jq -r '.u' "$CONFIG_FILE")
-        USERS="${USERS}@taoziyoyo.com"
-        PORT=$(jq -r '.p' "$CONFIG_FILE")
-        URL_ID=$(jq -r '.i' "$CONFIG_FILE")
-        EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
-        DOMAIN_NAME=$(jq -r '.n' "$CONFIG_FILE")
-        DOMAIN_NAME="${DOMAIN_NAME}o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+    # 设置镜像名称
+    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+    IMAGE_BASE_NAME="vless_reality"
+    NEW_VERSION=$(get_latest_version "$IMAGE_BASE_NAME")
+    IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
+    IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
+
+    # 添加构建 Docker 镜像的提示
+    read -p "是否生成新的 Docker 镜像？(y/n): " build_choice
+    if [ "$build_choice" = "y" ] || [ "$build_choice" = "Y" ]; then
+        # 构建 Docker 镜像
+        log_info "正在构建 Docker 镜像：$IMAGE_NAME"
+        docker build -t "$IMAGE_NAME" .
+        if [ $? -ne 0 ]; then
+            log_error "Docker 镜像构建失败。"
+            exit 1
+        fi
+    else
+        log_info "跳过 Docker 镜像构建，使用现有镜像。"
+        # 使用最新的已存在的镜像
+        EXISTING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE_NAME}:" | head -n1)
+        if [ -z "$EXISTING_IMAGE" ]; then
+            log_error "没有找到现有的镜像，请先构建一个。"
+            exit 1
+        else
+            IMAGE_NAME="$EXISTING_IMAGE"
+            log_info "使用现有的镜像：$IMAGE_NAME"
+        fi
+    fi
+
+    if [ -n "$DIRECTORY" ]; then
+        # 检查目录是否存在
+        if [ ! -d "$DIRECTORY" ]; then
+            log_error "目录 $DIRECTORY 不存在。"
+            exit 1
+        fi
+        # 处理目录下的所有 JSON 文件
+        for CONFIG_FILE in "$DIRECTORY"/*.json; do
+            if [ -f "$CONFIG_FILE" ]; then
+                log_info "正在处理配置文件: $CONFIG_FILE"
+                process_config_file "$CONFIG_FILE"
+            fi
+        done
+    else
+        if [ -n "$CONFIG_FILE" ]; then
+            process_config_file "$CONFIG_FILE"
+        else
+            log_error "必须指定配置文件 (-f) 或目录 (-d)。"
+            exit 1
+        fi
+    fi
+
+    log_info "操作成功完成。"
+}
+
+# 处理单个配置文件的函数
+process_config_file() {
+    local CONFIG_FILE="$1"
+    local USERS PORT URL_ID EXPIRE_DATE_ISO DOMAIN_NAME EXPIRE_DATE
+    local CLIENTS_JSON USER_UUID_LIST USER_INFO_LIST NODE_INFO_LIST
+    local CONTAINER_NAME CONFIG_DIR
+    local PRIVATEKEY PUBLICKEY
+    local REGION_VAR DOMAIN_NAME_VAR
+    local FLOW NETWORK DEST SERVERNAMES SNI FINGERPRINT SHORTID
+    local CPU_LIMIT="$CPU_LIMIT"  # Use the global CPU_LIMIT
+    local MEMORY_LIMIT="$MEMORY_LIMIT"  # Use the global MEMORY_LIMIT
+
+    # 解析 JSON 文件
+    USERS=$(jq -r '.u' "$CONFIG_FILE")
+    USERS="${USERS}@taoziyoyo.com"
+    PORT=$(jq -r '.p' "$CONFIG_FILE")
+    URL_ID=$(jq -r '.i' "$CONFIG_FILE")
+    EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
+    REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
+    DOMAIN_NAME_VAR=$(jq -r '.n' "$CONFIG_FILE")
+    local DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+
+    # 如果命令行没有提供 DOMAIN_NAME，从配置文件获取
+    if [ -z "$DOMAIN_NAME" ]; then
+        DOMAIN_NAME="${DOMAIN_NAME_VAR}${DOMAIN_SUFFIX}"
+    else
+        DOMAIN_NAME="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
+    fi
+
+    # 如果命令行没有提供 REGION，从配置文件获取
+    if [ -z "$REGION" ]; then
+        REGION="$REGION_VAR"
     fi
 
     # 验证 USERS
     if [ -z "$USERS" ]; then
-        log_error "必须指定用户列表，使用 -u 参数。"
+        log_error "必须指定用户列表，使用 -u 参数或在配置文件中指定。"
         exit 1
     fi
 
     # 验证 DOMAIN_NAME
     if [ -z "$DOMAIN_NAME" ]; then
-        log_error "必须指定域名，使用 -n 参数。"
+        log_error "必须指定域名，使用 -n 参数或在配置文件中指定。"
         exit 1
     fi
 
@@ -307,7 +424,6 @@ main() {
     # 设置其他默认值
     PORT="${PORT:-$(generate_random_port)}"
 
-#    URL_ID="$(generate_url_id)"
     # 验证 URL_ID，如果提供了 URL_ID，验证它是否正确
     if [ -n "$URL_ID" ]; then
         if ! echo "$URL_ID" | grep -qE '^[A-Z0-9]{8}$'; then
@@ -364,7 +480,10 @@ main() {
     cat "${CONFIG_DIR}/users.json" | jq .
 
     # 生成密钥
-    generate_x25519_keys
+    local key_pair
+    key_pair=$(generate_x25519_keys "${CONFIG_DIR}")
+    PRIVATEKEY=$(echo "$key_pair" | cut -d'|' -f1)
+    PUBLICKEY=$(echo "$key_pair" | cut -d'|' -f2)
 
     # 更新配置文件
     cp ./config.json "${CONFIG_DIR}/config.json"
@@ -397,36 +516,6 @@ main() {
         .inbounds[0].streamSettings.network = $network |
         .inbounds[0].streamSettings.realitySettings.shortIds = [$shortId]' \
        "${CONFIG_DIR}/config.json" > "${CONFIG_DIR}/config_tmp.json" && mv "${CONFIG_DIR}/config_tmp.json" "${CONFIG_DIR}/config.json"
-
-    # 设置镜像名称
-    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-    IMAGE_BASE_NAME="vless_reality"
-    NEW_VERSION=$(get_latest_version "$IMAGE_BASE_NAME")
-    IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
-    IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
-
-    # 添加构建 Docker 镜像的提示
-    read -p "是否生成新的 Docker 镜像？(y/n): " build_choice
-    if [ "$build_choice" = "y" ] || [ "$build_choice" = "Y" ]; then
-        # 构建 Docker 镜像
-        log_info "正在构建 Docker 镜像：$IMAGE_NAME"
-        docker build -t "$IMAGE_NAME" .
-        if [ $? -ne 0 ]; then
-            log_error "Docker 镜像构建失败。"
-            exit 1
-        fi
-    else
-        log_info "跳过 Docker 镜像构建，使用现有镜像。"
-        # 使用最新的已存在的镜像
-        EXISTING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE_NAME}:" | head -n1)
-        if [ -z "$EXISTING_IMAGE" ]; then
-            log_error "没有找到现有的镜像，请先构建一个。"
-            exit 1
-        else
-            IMAGE_NAME="$EXISTING_IMAGE"
-            log_info "使用现有的镜像：$IMAGE_NAME"
-        fi
-    fi
 
     # 构建 DOCKER_RUN_CMD
     DOCKER_RUN_CMD=(docker run -d --name "$CONTAINER_NAME" \
@@ -544,41 +633,6 @@ main() {
 
     # 输出节点信息和生成二维码
     display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
-
-    log_info "操作成功完成。"
-}
-
-# 显示节点信息并生成二维码的函数
-display_node_info_with_qr() {
-    local node_info_file="$1"
-
-    if [ ! -f "$node_info_file" ]; then
-        log_error "文件 $node_info_file 不存在。"
-        exit 1
-    fi
-
-    # 使用 jq 格式化输出 nodeInfo.json
-    log_info "以下是 nodeInfo.json 的内容："
-    jq . "$node_info_file"
-
-    # 遍历 JSON 文件，逐个用户输出二维码
-    local users
-    users=$(jq -c '.[]' "$node_info_file")
-    for user in $users; do
-        local email
-        local sub_link
-
-        email=$(echo "$user" | jq -r '.user')
-        sub_link=$(echo "$user" | jq -r '.subscription')
-
-        echo "用户: $email"
-        echo "订阅链接: $sub_link"
-
-        # 使用 qrencode 输出二维码到控制台
-        qrencode -t ANSIUTF8 "$sub_link"
-
-        echo
-    done
 }
 
 # 执行主函数
