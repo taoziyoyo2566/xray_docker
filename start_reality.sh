@@ -17,6 +17,7 @@ show_help() {
     echo "Options:"
     echo "  -u USERS         设置用户列表（用逗号分隔）"
     echo "  -p PORT          设置端口号（5位，>20000）"
+    echo "  -i URL_ID        指定 URL ID（8位大写字母和数字）"
     echo "  -r REGION        设置区域标识（6位大写字母）"
     echo "  -d DAYS          设置有效天数"
     echo "  -m MONTHS        设置有效月数"
@@ -24,6 +25,7 @@ show_help() {
     echo "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
     echo "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
     echo "  -n DOMAIN_NAME   设置域名（例如，example.com）"
+    echo "  -f CONFIG_FILE   指定 JSON 配置文件"
     echo "  -h               显示帮助信息"
 }
 
@@ -200,11 +202,13 @@ main() {
     MEMORY_LIMIT="300m" # 默认内存限制
     EXPIRE_DATE=""      # 用户有效期
     DOMAIN_NAME=""      # 域名
+    URL_ID=""           # URL ID, 默认为空
 
     # 使用 getopts 解析命令行参数
-    while getopts "u:p:r:d:m:c:M:e:n:h" opt; do
+    while getopts "u:i:p:r:d:m:c:M:e:n:f:h" opt; do
         case $opt in
             u) USERS="$OPTARG";;
+            i) URL_ID="$OPTARG";;
             p) PORT="$OPTARG";;
             r) REGION="$OPTARG";;
             d) DAY_COUNT="$OPTARG";;
@@ -213,6 +217,7 @@ main() {
             M) MEMORY_LIMIT="$OPTARG";;
             e) EXPIRE_DATE="$OPTARG";;
             n) DOMAIN_NAME="$OPTARG";;
+            f) CONFIG_FILE="$OPTARG";;
             h)
                 show_help
                 exit 0;;
@@ -222,6 +227,17 @@ main() {
                 exit 1;;
         esac
     done
+
+    if [ -n "$CONFIG_FILE" ]; then
+        # 解析 JSON 文件
+        USERS=$(jq -r '.u' "$CONFIG_FILE")
+        USERS="${USERS}@taoziyoyo.com"
+        PORT=$(jq -r '.p' "$CONFIG_FILE")
+        URL_ID=$(jq -r '.i' "$CONFIG_FILE")
+        EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
+        DOMAIN_NAME=$(jq -r '.n' "$CONFIG_FILE")
+        DOMAIN_NAME="${DOMAIN_NAME}o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+    fi
 
     # 验证 USERS
     if [ -z "$USERS" ]; then
@@ -289,8 +305,19 @@ main() {
     CLIENTS_JSON=$(printf '%s\n' "${USER_UUID_LIST[@]}" | jq -s '.')
 
     # 设置其他默认值
-    URL_ID="$(generate_url_id)"
     PORT="${PORT:-$(generate_random_port)}"
+
+#    URL_ID="$(generate_url_id)"
+    # 验证 URL_ID，如果提供了 URL_ID，验证它是否正确
+    if [ -n "$URL_ID" ]; then
+        if ! echo "$URL_ID" | grep -qE '^[A-Z0-9]{8}$'; then
+            log_error "URL ID 必须是8位大写字母和数字的组合。"
+            exit 1
+        fi
+    else
+        # 如果没有指定 URL_ID，生成一个
+        URL_ID=$(generate_url_id)
+    fi
     REGION="${REGION:-TESTUS}"
     NETWORK="tcp"
     DEST="www.apple.com:443"
