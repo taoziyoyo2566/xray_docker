@@ -248,9 +248,7 @@ process_config_file() {
     DOMAIN_NAME_FULL="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
 
     # 如果命令行没有提供 REGION，从配置文件获取
-    if [ -z "$REGION" ]; then
-        REGION="$REGION_VAR"
-    fi
+    # REGION="${REGION:-TESTUS}"  # 已移除，因为 'r' 从 JSON 文件中读取
 
     # 验证 USERS
     if [ -z "$USERS" ]; then
@@ -330,7 +328,7 @@ process_config_file() {
         # 如果没有指定 URL_ID，生成一个
         URL_ID=$(generate_url_id)
     fi
-    REGION="${REGION:-TESTUS}"
+    REGION="${REGION_VAR:-TESTUS}"
     NETWORK="tcp"
     DEST="www.apple.com:443"
     SERVERNAMES="www.apple.com images.apple.com"
@@ -361,12 +359,6 @@ process_config_file() {
 
     # 将 CLIENTS_JSON 写入 users.json
     echo "$CLIENTS_JSON" > "${CONFIG_DIR}/users.json"
-
-    # 检查 users.json 是否成功创建
-    if [ ! -f "${CONFIG_DIR}/users.json" ]; then
-        log_error "users.json 文件创建失败。"
-        exit 1
-    fi
 
     # 设置文件权限
     chmod 600 "${CONFIG_DIR}/users.json"
@@ -547,7 +539,7 @@ main() {
     USERS=""
     PORT=""
     MONTH_COUNT=""
-    REGION=""
+    REGION=""  # 移除 -r 参数
     CPU_LIMIT="0.5"    # 默认 CPU 限制
     MEMORY_LIMIT="300m" # 默认内存限制
     EXPIRE_DATE=""      # 用户有效期
@@ -555,13 +547,12 @@ main() {
     CONFIG_FILE=""
     DIRECTORY=""
 
-    # 使用 getopts 解析命令行参数，移除 -n 参数
-    while getopts "u:i:p:r:d:m:c:M:e:f:h" opt; do
+    # 使用 getopts 解析命令行参数，移除 -r 参数
+    while getopts "u:i:p:d:m:c:M:e:f:h" opt; do
         case $opt in
             u) USERS="$OPTARG";;
             i) URL_ID="$OPTARG";;
             p) PORT="$OPTARG";;
-            r) REGION="$OPTARG";;
             d) DIRECTORY="$OPTARG";;
             m) MONTH_COUNT="$OPTARG";;
             c) CPU_LIMIT="$OPTARG";;
