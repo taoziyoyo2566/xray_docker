@@ -15,3 +15,14 @@ for file in client/*.json; do sed -i 's/"r": "ALPSHA"/"r": "SPTSHA"/g; s/"n": "a
 
 如果文件数量较多且需要备份，您可以在 sed 中添加备份选项，例如 -i.bak，生成备份文件：
 for file in client/*.json; do sed -i.bak 's/"r": "ALPSHA"/"r": "SPTSHA"/g; s/"n": "alp"/"n": "spt"/g' "$file"; done
+
+bash user_config.sh -n alp -u cpp,frank,taoziyoyo,shm,szm,yinlu --new
+
+bash user_config.sh --new -n alp -u cpp,frank,taoziyoyo,shm,szm,yinlu
+bash user_config.sh --new -n spt -u cpp,frank,taoziyoyo,shm,szm,yinlu -d client_alp_202412021515
+
+bash user_config.sh --transfer -n spt -d client_alp_202412021515
+
+bash user_config.sh -n alp  --transfer
+
+bash start_reality.sh -d client_date

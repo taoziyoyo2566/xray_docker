@@ -1,32 +1,34 @@
 #!/bin/bash
 set -o pipefail
 
-# 日志函数，将输出重定向到标准错误
+# 定义日志文件，位于当前目录，带有时间戳
+LOGFILE="$(pwd)/script_log_$(date +%Y%m%d%H%M%S).log"
+
+# 日志函数，将输出重定向到日志文件和标准错误
 log_info() {
-    echo -e "\033[32m[INFO]\033[0m $1" >&2
+    echo -e "\033[32m[INFO]\033[0m $1" | tee -a "$LOGFILE" >&2
 }
 
 log_error() {
-    echo -e "\033[31m[ERROR]\033[0m $1" >&2
+    echo -e "\033[31m[ERROR]\033[0m $1" | tee -a "$LOGFILE" >&2
 }
 
-# 显示帮助信息的函数
+# 显示帮助信息的函数，使用 log_info 输出
 show_help() {
-    echo "Usage: $0 [options]"
-    echo
-    echo "Options:"
-    echo "  -u USERS         设置用户列表（用逗号分隔）"
-    echo "  -p PORT          设置端口号（5位，>20000）"
-    echo "  -i URL_ID        指定 URL ID（8位大写字母和数字）"
-    echo "  -r REGION        设置区域标识（6位大写字母）"
-    echo "  -d DIRECTORY     指定包含 JSON 配置文件的目录"
-    echo "  -m MONTHS        设置有效月数"
-    echo "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
-    echo "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
-    echo "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
-    echo "  -n DOMAIN_NAME   设置域名（例如，example.com）"
-    echo "  -f CONFIG_FILE   指定 JSON 配置文件"
-    echo "  -h               显示帮助信息"
+    log_info "Usage: $0 [options]"
+    log_info ""
+    log_info "Options:"
+    log_info "  -u USERS         设置用户列表（用逗号分隔）"
+    log_info "  -p PORT          设置端口号（5位，>20000）"
+    log_info "  -i URL_ID        指定 URL ID（8位大写字母和数字）"
+    log_info "  -r REGION        设置区域标识（6位大写字母）"
+    log_info "  -d DIRECTORY     指定包含 JSON 配置文件的目录"
+    log_info "  -m MONTHS        设置有效月数"
+    log_info "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
+    log_info "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
+    log_info "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
+    log_info "  -f CONFIG_FILE   指定 JSON 配置文件"
+    log_info "  -h               显示帮助信息"
 }
 
 # 生成包含大写字母和数字的随机 URL_ID
@@ -38,8 +40,8 @@ generate_url_id() {
 generate_random_port() {
     while true; do
         port=$((RANDOM % 45536 + 20000))
-        if [ $port -le 65535 ] && ! is_port_in_use $port; then
-            echo $port
+        if [ "$port" -le 65535 ] && ! is_port_in_use "$port"; then
+            echo "$port"
             return
         fi
     done
@@ -61,9 +63,9 @@ check_and_install() {
     local pkg=$2
     if ! command -v "$cmd" >/dev/null 2>&1; then
         read -p "$cmd 未安装，是否安装 $pkg？(y/n): " choice
-        if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+        if [[ "$choice" =~ ^[Yy]$ ]]; then
             sudo apt-get update
-            sudo apt-get install -y $pkg
+            sudo apt-get install -y "$pkg"
             if [ $? -ne 0 ]; then
                 log_error "安装 $pkg 失败。"
                 exit 1
@@ -167,24 +169,24 @@ urlencode() {
 
 # 定义 get_country 方法
 get_country() {
-  # 获取本机外网IP地址
-  local ip=$(curl -s https://api.ipify.org)
+    # 获取本机外网IP地址
+    local ip=$(curl -s https://api.ipify.org)
 
-  if [ -z "$ip" ]; then
-    echo "无法获取本机外网IP地址"
-    return 1
-  fi
+    if [ -z "$ip" ]; then
+        log_error "无法获取本机外网IP地址"
+        return 1
+    fi
 
-  # 使用ipinfo.io API获取IP地址的地理位置
-  local country=$(curl -s "https://ipinfo.io/$ip" | jq -r '.country')
+    # 使用ipinfo.io API获取IP地址的地理位置
+    local country=$(curl -s "https://ipinfo.io/$ip" | jq -r '.country')
 
-  if [ -z "$country" ]; then
-    echo "无法获取国家信息 for IP: $ip"
-    return 1
-  fi
+    if [ -z "$country" ]; then
+        log_error "无法获取国家信息 for IP: $ip"
+        return 1
+    fi
 
-  # 输出国家信息
-  echo "$country"
+    # 输出国家信息
+    echo "$country"
 }
 
 # 显示节点信息并生成二维码的函数
@@ -198,7 +200,7 @@ display_node_info_with_qr() {
 
     # 使用 jq 格式化输出 nodeInfo.json
     log_info "以下是 nodeInfo.json 的内容："
-    jq . "$node_info_file"
+    jq . "$node_info_file" | tee -a "$LOGFILE"
 
     # 遍历 JSON 文件，逐个用户输出二维码
     local users
@@ -210,8 +212,8 @@ display_node_info_with_qr() {
         email=$(echo "$user" | jq -r '.user')
         sub_link=$(echo "$user" | jq -r '.subscription')
 
-        echo "用户: $email"
-        echo "订阅链接: $sub_link"
+        log_info "用户: $email"
+        log_info "订阅链接: $sub_link"
 
         # 使用 qrencode 输出二维码到控制台
         qrencode -t ANSIUTF8 "$sub_link"
@@ -220,119 +222,17 @@ display_node_info_with_qr() {
     done
 }
 
-# 主函数
-main() {
-    # 检查并安装必要的软件
-    check_and_install uuidgen uuid-runtime
-    check_and_install jq jq
-    check_and_install qrencode qrencode
-    check_and_install docker docker.io
-    check_and_install netstat net-tools
-    check_and_install curl curl
-
-    # 初始化变量，设置默认值
-    USERS=""
-    PORT=""
-    MONTH_COUNT=""
-    REGION=""
-    CPU_LIMIT="0.5"    # 默认 CPU 限制
-    MEMORY_LIMIT="300m" # 默认内存限制
-    EXPIRE_DATE=""      # 用户有效期
-    DOMAIN_NAME=""      # 域名
-    URL_ID=""           # URL ID, 默认为空
-    CONFIG_FILE=""
-    DIRECTORY=""
-
-    # 使用 getopts 解析命令行参数
-    while getopts "u:i:p:r:d:m:c:M:e:n:f:h" opt; do
-        case $opt in
-            u) USERS="$OPTARG";;
-            i) URL_ID="$OPTARG";;
-            p) PORT="$OPTARG";;
-            r) REGION="$OPTARG";;
-            d) DIRECTORY="$OPTARG";;
-            m) MONTH_COUNT="$OPTARG";;
-            c) CPU_LIMIT="$OPTARG";;
-            M) MEMORY_LIMIT="$OPTARG";;
-            e) EXPIRE_DATE="$OPTARG";;
-            n) DOMAIN_NAME="$OPTARG";;
-            f) CONFIG_FILE="$OPTARG";;
-            h)
-                show_help
-                exit 0;;
-            *)
-                log_error "未知的选项: -$opt"
-                show_help
-                exit 1;;
-        esac
-    done
-
-    # 设置镜像名称
-    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-    IMAGE_BASE_NAME="vless_reality"
-    NEW_VERSION=$(get_latest_version "$IMAGE_BASE_NAME")
-    IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
-    IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
-
-    # 添加构建 Docker 镜像的提示
-    read -p "是否生成新的 Docker 镜像？(y/n): " build_choice
-    if [ "$build_choice" = "y" ] || [ "$build_choice" = "Y" ]; then
-        # 构建 Docker 镜像
-        log_info "正在构建 Docker 镜像：$IMAGE_NAME"
-        docker build -t "$IMAGE_NAME" .
-        if [ $? -ne 0 ]; then
-            log_error "Docker 镜像构建失败。"
-            exit 1
-        fi
-    else
-        log_info "跳过 Docker 镜像构建，使用现有镜像。"
-        # 使用最新的已存在的镜像
-        EXISTING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE_NAME}:" | head -n1)
-        if [ -z "$EXISTING_IMAGE" ]; then
-            log_error "没有找到现有的镜像，请先构建一个。"
-            exit 1
-        else
-            IMAGE_NAME="$EXISTING_IMAGE"
-            log_info "使用现有的镜像：$IMAGE_NAME"
-        fi
-    fi
-
-    if [ -n "$DIRECTORY" ]; then
-        # 检查目录是否存在
-        if [ ! -d "$DIRECTORY" ]; then
-            log_error "目录 $DIRECTORY 不存在。"
-            exit 1
-        fi
-        # 处理目录下的所有 JSON 文件
-        for CONFIG_FILE in "$DIRECTORY"/*.json; do
-            if [ -f "$CONFIG_FILE" ]; then
-                log_info "正在处理配置文件: $CONFIG_FILE"
-                process_config_file "$CONFIG_FILE"
-            fi
-        done
-    else
-        if [ -n "$CONFIG_FILE" ]; then
-            process_config_file "$CONFIG_FILE"
-        else
-            log_error "必须指定配置文件 (-f) 或目录 (-d)。"
-            exit 1
-        fi
-    fi
-
-    log_info "操作成功完成。"
-}
-
 # 处理单个配置文件的函数
 process_config_file() {
     local CONFIG_FILE="$1"
-    local USERS PORT URL_ID EXPIRE_DATE_ISO DOMAIN_NAME EXPIRE_DATE
+    local USERS PORT URL_ID EXPIRE_DATE_ISO EXPIRE_DATE
     local CLIENTS_JSON USER_UUID_LIST USER_INFO_LIST NODE_INFO_LIST
     local CONTAINER_NAME CONFIG_DIR
     local PRIVATEKEY PUBLICKEY
-    local REGION_VAR DOMAIN_NAME_VAR
+    local REGION_VAR DOMAIN_SUFFIX
     local FLOW NETWORK DEST SERVERNAMES SNI FINGERPRINT SHORTID
-    local CPU_LIMIT="$CPU_LIMIT"  # Use the global CPU_LIMIT
-    local MEMORY_LIMIT="$MEMORY_LIMIT"  # Use the global MEMORY_LIMIT
+    local CPU_LIMIT="$CPU_LIMIT"       # 使用全局 CPU_LIMIT
+    local MEMORY_LIMIT="$MEMORY_LIMIT" # 使用全局 MEMORY_LIMIT
 
     # 解析 JSON 文件
     USERS=$(jq -r '.u' "$CONFIG_FILE")
@@ -341,15 +241,11 @@ process_config_file() {
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
-    DOMAIN_NAME_VAR=$(jq -r '.n' "$CONFIG_FILE")
-    local DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+    DOMAIN_NAME=$(jq -r '.n' "$CONFIG_FILE")  # 从 JSON 文件中读取 "n"
 
-    # 如果命令行没有提供 DOMAIN_NAME，从配置文件获取
-    if [ -z "$DOMAIN_NAME" ]; then
-        DOMAIN_NAME="${DOMAIN_NAME_VAR}${DOMAIN_SUFFIX}"
-    else
-        DOMAIN_NAME="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
-    fi
+    # 添加域名后缀
+    DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
+    DOMAIN_NAME_FULL="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
 
     # 如果命令行没有提供 REGION，从配置文件获取
     if [ -z "$REGION" ]; then
@@ -363,13 +259,13 @@ process_config_file() {
     fi
 
     # 验证 DOMAIN_NAME
-    if [ -z "$DOMAIN_NAME" ]; then
+    if [ -z "$DOMAIN_NAME_FULL" ]; then
         log_error "必须指定域名，使用 -n 参数或在配置文件中指定。"
         exit 1
     fi
 
     # 验证 DOMAIN_NAME 是否包含非法字符
-    if echo "$DOMAIN_NAME" | grep -q '@'; then
+    if echo "$DOMAIN_NAME_FULL" | grep -q '@'; then
         log_error "域名不能包含 '@' 符号，请提供有效的域名。"
         exit 1
     fi
@@ -407,7 +303,7 @@ process_config_file() {
             --arg alterId "0" \
             --arg expire "${EXPIRE_DATE_ISO:-}" \
             '{
-                email: $email,
+                user: $email,
                 id: $uuid,
                 flow: $flow,
                 level: ($level | tonumber),
@@ -477,7 +373,7 @@ process_config_file() {
 
     # 显示生成的用户信息
     log_info "已生成 users.json，内容如下："
-    cat "${CONFIG_DIR}/users.json" | jq .
+    jq . "${CONFIG_DIR}/users.json" | tee -a "$LOGFILE"
 
     # 生成密钥
     local key_pair
@@ -549,7 +445,7 @@ process_config_file() {
         log_error "容器 $CONTAINER_NAME 启动失败。"
         # 输出容器日志
         log_error "容器日志："
-        docker logs "$CONTAINER_NAME"
+        docker logs "$CONTAINER_NAME" | tee -a "$LOGFILE"
         exit 1
     fi
 
@@ -562,7 +458,7 @@ process_config_file() {
         email=$(echo "$user_info" | cut -d'|' -f1)
         uuid=$(echo "$user_info" | cut -d'|' -f2)
         encoded_email=$(urlencode "$email")
-        SUB_LINK="vless://${uuid}@${DOMAIN_NAME}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
+        SUB_LINK="vless://${uuid}@${DOMAIN_NAME_FULL}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
 
         # 调用 get_country 方法并打印结果
         COUNTRY=$(get_country)
@@ -574,12 +470,14 @@ process_config_file() {
             --arg expire "${EXPIRE_DATE_ISO:-}" \
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
+            --arg n "$DOMAIN_NAME" \
             '{
                 user: $user,
                 id: $id,
                 expire: $expire,
                 subscription: $subscription,
-                country: $country
+                country: $country,
+                n: $n
             }')
         NODE_INFO_LIST+=("$node_info_json")
     done
@@ -611,7 +509,7 @@ process_config_file() {
     fi
 
     log_info "已生成 nodeInfo.json，内容如下："
-    jq . "${CONFIG_DIR}/nodeInfo.json"
+    jq . "${CONFIG_DIR}/nodeInfo.json" | tee -a "$LOGFILE"
 
     # 设置文件权限
     chmod 600 "${CONFIG_DIR}/nodeInfo.json"
@@ -633,6 +531,106 @@ process_config_file() {
 
     # 输出节点信息和生成二维码
     display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
+}
+
+# 主函数
+main() {
+    # 检查并安装必要的软件
+    check_and_install uuidgen uuid-runtime
+    check_and_install jq jq
+    check_and_install qrencode qrencode
+    check_and_install docker docker.io
+    check_and_install netstat net-tools
+    check_and_install curl curl
+
+    # 初始化变量，设置默认值
+    USERS=""
+    PORT=""
+    MONTH_COUNT=""
+    REGION=""
+    CPU_LIMIT="0.5"    # 默认 CPU 限制
+    MEMORY_LIMIT="300m" # 默认内存限制
+    EXPIRE_DATE=""      # 用户有效期
+    URL_ID=""           # URL ID, 默认为空
+    CONFIG_FILE=""
+    DIRECTORY=""
+
+    # 使用 getopts 解析命令行参数，移除 -n 参数
+    while getopts "u:i:p:r:d:m:c:M:e:f:h" opt; do
+        case $opt in
+            u) USERS="$OPTARG";;
+            i) URL_ID="$OPTARG";;
+            p) PORT="$OPTARG";;
+            r) REGION="$OPTARG";;
+            d) DIRECTORY="$OPTARG";;
+            m) MONTH_COUNT="$OPTARG";;
+            c) CPU_LIMIT="$OPTARG";;
+            M) MEMORY_LIMIT="$OPTARG";;
+            e) EXPIRE_DATE="$OPTARG";;
+            f) CONFIG_FILE="$OPTARG";;
+            h)
+                show_help
+                exit 0;;
+            *)
+                log_error "未知的选项: -$opt"
+                show_help
+                exit 1;;
+        esac
+    done
+
+    # 设置镜像名称
+    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+    IMAGE_BASE_NAME="vless_reality"
+    NEW_VERSION=$(get_latest_version "$IMAGE_BASE_NAME")
+    IMAGE_VERSION="v${NEW_VERSION}_${TIMESTAMP}"
+    IMAGE_NAME="${IMAGE_BASE_NAME}:${IMAGE_VERSION}"
+
+    # 添加构建 Docker 镜像的提示
+    read -p "是否生成新的 Docker 镜像？(y/n): " build_choice
+    if [[ "$build_choice" =~ ^[Yy]$ ]]; then
+        # 构建 Docker 镜像
+        log_info "正在构建 Docker 镜像：$IMAGE_NAME"
+        docker build -t "$IMAGE_NAME" .
+        if [ $? -ne 0 ]; then
+            log_error "Docker 镜像构建失败。"
+            exit 1
+        fi
+    else
+        log_info "跳过 Docker 镜像构建，使用现有镜像。"
+        # 使用最新的已存在的镜像
+        EXISTING_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^${IMAGE_BASE_NAME}:" | head -n1)
+        if [ -z "$EXISTING_IMAGE" ]; then
+            log_error "没有找到现有的镜像，请先构建一个。"
+            exit 1
+        else
+            IMAGE_NAME="$EXISTING_IMAGE"
+            log_info "使用现有的镜像：$IMAGE_NAME"
+        fi
+    fi
+
+    if [ -n "$DIRECTORY" ]; then
+        # 检查目录是否存在
+        if [ ! -d "$DIRECTORY" ]; then
+            log_error "目录 $DIRECTORY 不存在。"
+            exit 1
+        fi
+        # 处理目录下的所有 JSON 文件
+        for CONFIG_FILE in "$DIRECTORY"/*.json; do
+            if [ -f "$CONFIG_FILE" ]; then
+                log_info "正在处理配置文件: $CONFIG_FILE"
+                process_config_file "$CONFIG_FILE"
+            fi
+        done
+    else
+        if [ -n "$CONFIG_FILE" ]; then
+            process_config_file "$CONFIG_FILE"
+        else
+            log_error "必须指定配置文件 (-f) 或目录 (-d)。"
+            exit 1
+        fi
+    fi
+
+    log_info "操作成功完成。"
 }
 
 # 执行主函数
