@@ -18,7 +18,7 @@ show_help() {
     log_info "Usage: $0 [options]"
     log_info ""
     log_info "Options:"
-    log_info "  -n|--namespace    设置命名空间 (必需)"
+    log_info "  -s|--server       设置服务器 (必需)"
     log_info "  -u|--users        设置用户列表（用逗号分隔，创建新文件时必需）"
     log_info "  -d|--directory    指定目录路径 (创建新文件时为输出目录的基准名, 修改现有文件时为源目录)"
     log_info "  --new             创建新的 JSON 配置文件"
@@ -41,7 +41,7 @@ calculate_expiration_date() {
     date -d "+1 year" +%Y%m%d
 }
 
-# Create directory with namespace and date part
+# Create directory with server and date part
 create_directory() {
     local base_dir="$1"
     local date_part
@@ -52,7 +52,7 @@ create_directory() {
     else
         log_info "提取到的日期部分: $date_part"
     fi
-    local dir_name="client_${namespace}_${date_part}"
+    local dir_name="client_${server}_${date_part}"
     mkdir -p "$dir_name"
     if [[ $? -ne 0 ]]; then
         log_error "无法创建目标目录: $dir_name"
@@ -74,10 +74,11 @@ modify_json_files() {
         # 提取用户名前三个字符并转换为大写
         user_prefix_upper=$(echo "${user:0:3}" | tr '[:lower:]' '[:upper:]')
         # 使用 jq 修改 "r" 和 "n" 字段
-        jq --arg ref "${namespace^^}${user_prefix_upper}" \
-           --arg namespace "$namespace" \
-           ".r = \$ref | .n = \$namespace" \
-           "$file" > "${target_dir}/${user}.json"
+        # 使用 jq 修改 JSON：更新 "r" 字段，新增 "s" 字段，移除 "n" 字段
+        jq --arg ref "${server^^}${user_prefix_upper}" \
+                   --arg server "$server" \
+                   '.r = $ref | .s = $server' \
+                   "$file" > "${target_dir}/${user}.json"
 
         if [ $? -eq 0 ]; then
             log_info "已修改并保存文件: ${target_dir}/${user}.json"
@@ -92,7 +93,7 @@ modify_json_files() {
 # 主函数
 main() {
     # 初始化变量，设置默认值
-    namespace=""
+    server=""
     users=""
     mode=""
     directory=""
@@ -107,8 +108,8 @@ main() {
     while [[ "$#" -gt 0 ]]; do
         key="$1"
         case $key in
-            -n|--namespace)
-                namespace="$2"
+            -s|--server)
+                server="$2"
                 shift # past argument
                 shift # past value
                 ;;
@@ -143,8 +144,8 @@ main() {
     done
 
     # 验证必要参数
-    if [[ -z "$namespace" ]]; then
-        log_error "必须指定命名空间，使用 -n 或 --namespace 参数。"
+    if [[ -z "$server" ]]; then
+        log_error "必须指定服务器，使用 -s 或 --server 参数。"
         show_help
         exit 1
     fi
@@ -163,7 +164,7 @@ main() {
                 exit 1
             fi
             if [[ -z "$directory" ]]; then
-                # 自动创建目录，包含命名空间和时间戳
+                # 自动创建目录，包含服务器和时间戳
                 dir_name=$(create_directory "")
             else
                 # 使用指定的目录名作为基准，提取日期部分
@@ -174,7 +175,7 @@ main() {
                 port=$(generate_random_port)
                 id=$(generate_random_id)
                 expiration=$(calculate_expiration_date)
-                ref=$(echo "${namespace}${user:0:3}" | tr '[:lower:]' '[:upper:]')
+                ref=$(echo "${server}${user:0:3}" | tr '[:lower:]' '[:upper:]')
                 # 生成 JSON 文件
                 cat > "$dir_name/$user.json" <<EOF
 {
@@ -183,7 +184,7 @@ main() {
   "i": "$id",
   "e": "$expiration",
   "r": "$ref",
-  "n": "$namespace"
+  "n": "$server"
 }
 EOF
                 if [ $? -eq 0 ]; then
@@ -212,7 +213,7 @@ EOF
                 log_info "提取到的日期部分: $date_part"
             fi
             # 创建目标目录
-            target_dir="client_${namespace}_${date_part}"
+            target_dir="client_${server}_${date_part}"
             mkdir -p "$target_dir"
             if [[ $? -ne 0 ]]; then
                 log_error "无法创建目标目录: $target_dir"
