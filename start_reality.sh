@@ -198,8 +198,8 @@ display_node_info_with_qr() {
         exit 1
     fi
 
-    # 使用 jq 格式化输出 nodeInfo.json
-    log_info "以下是 nodeInfo.json 的内容："
+    # 使用 jq 格式化输出 nodeInfo-<n>.json
+    log_info "以下是 $(basename "$node_info_file") 的内容："
     jq . "$node_info_file" | tee -a "$LOGFILE"
 
     # 遍历 JSON 文件，逐个用户输出二维码
@@ -233,6 +233,7 @@ process_config_file() {
     local FLOW NETWORK DEST SERVERNAMES SNI FINGERPRINT SHORTID
     local CPU_LIMIT="$CPU_LIMIT"       # 使用全局 CPU_LIMIT
     local MEMORY_LIMIT="$MEMORY_LIMIT" # 使用全局 MEMORY_LIMIT
+    local n u
 
     # 解析 JSON 文件
     USERS=$(jq -r '.u' "$CONFIG_FILE")
@@ -242,6 +243,10 @@ process_config_file() {
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
     DOMAIN_NAME=$(jq -r '.n' "$CONFIG_FILE")  # 从 JSON 文件中读取 "n"
+
+    # 获取 "u" 字段的值，用于目录名
+    u=$(jq -r '.u' "$CONFIG_FILE")
+    n=$(jq -r '.n' "$CONFIG_FILE")
 
     # 添加域名后缀
     DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
@@ -354,7 +359,8 @@ process_config_file() {
     CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
     # 创建用户配置文件目录
-    CONFIG_DIR="/opt/docker/reality/nodeInfo/${CONTAINER_NAME}"
+    # 修改目录为 /opt/docker/reality/nodeInfo/reality_<u>
+    CONFIG_DIR="/opt/docker/reality/nodeInfo/reality_${u}"
     mkdir -p "${CONFIG_DIR}/log"
 
     # 将 CLIENTS_JSON 写入 users.json
@@ -444,7 +450,7 @@ process_config_file() {
     # 等待容器内应用程序启动
     sleep 5
 
-    # 生成订阅链接并构建 nodeInfo.json
+    # 生成订阅链接并构建 nodeInfo-<n>.json
     NODE_INFO_LIST=()
     for user_info in "${USER_INFO_LIST[@]}"; do
         email=$(echo "$user_info" | cut -d'|' -f1)
@@ -455,7 +461,7 @@ process_config_file() {
         # 调用 get_country 方法并打印结果
         COUNTRY=$(get_country)
 
-        # 添加到 nodeInfo.json 数据中
+        # 添加到 nodeInfo-<n>.json 数据中
         node_info_json=$(jq -n \
             --arg user "$email" \
             --arg id "$uuid" \
@@ -474,55 +480,58 @@ process_config_file() {
         NODE_INFO_LIST+=("$node_info_json")
     done
 
-    # 生成 nodeInfo.json 文件
-    NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
-    echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/nodeInfo.json"
+    # 定义 nodeInfo 文件名为 nodeInfo-<n>.json
+    NODE_INFO_FILENAME="nodeInfo-${n}.json"
 
-    # 验证 nodeInfo.json 是否成功创建
-    if [ ! -s "${CONFIG_DIR}/nodeInfo.json" ]; then
-        log_error "nodeInfo.json 文件创建失败或为空。"
+    # 生成 nodeInfo-<n>.json 文件
+    NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
+    echo "$NODE_INFO_JSON" > "${CONFIG_DIR}/${NODE_INFO_FILENAME}"
+
+    # 验证 nodeInfo-<n>.json 是否成功创建
+    if [ ! -s "${CONFIG_DIR}/${NODE_INFO_FILENAME}" ]; then
+        log_error "${NODE_INFO_FILENAME} 文件创建失败或为空。"
         exit 1
     fi
-    log_info "nodeInfo.json 文件已成功创建。"
+    log_info "${NODE_INFO_FILENAME} 文件已成功创建。"
 
-    # 将 nodeInfo.json 拷贝到容器根目录
-    docker cp "${CONFIG_DIR}/nodeInfo.json" "${CONTAINER_NAME}:/nodeInfo.json"
+    # 将 nodeInfo-<n>.json 拷贝到容器根目录
+    docker cp "${CONFIG_DIR}/${NODE_INFO_FILENAME}" "${CONTAINER_NAME}:/nodeInfo-${n}.json"
     if [ $? -ne 0 ]; then
-        log_error "将 nodeInfo.json 拷贝到容器失败。"
+        log_error "将 ${NODE_INFO_FILENAME} 拷贝到容器失败。"
         exit 1
     fi
 
     # 检查是否成功拷贝
-    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo.json; then
-        log_info "已成功将 nodeInfo.json 拷贝到容器的根目录。"
+    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo-${n}.json; then
+        log_info "已成功将 ${NODE_INFO_FILENAME} 拷贝到容器的根目录。"
     else
-        log_error "将 nodeInfo.json 拷贝到容器失败。"
+        log_error "将 ${NODE_INFO_FILENAME} 拷贝到容器失败。"
         exit 1
     fi
 
-    log_info "已生成 nodeInfo.json，内容如下："
-    jq . "${CONFIG_DIR}/nodeInfo.json" | tee -a "$LOGFILE"
+    log_info "已生成 ${NODE_INFO_FILENAME}，内容如下："
+    jq . "${CONFIG_DIR}/${NODE_INFO_FILENAME}" | tee -a "$LOGFILE"
 
     # 设置文件权限
-    chmod 600 "${CONFIG_DIR}/nodeInfo.json"
+    chmod 600 "${CONFIG_DIR}/${NODE_INFO_FILENAME}"
 
-    # 新增：将 nodeInfo.json 放入共享卷的 node-info/实例名/ 目录中
+    # 新增：将 nodeInfo-<n>.json 放入共享卷的 node-info/<u>/ 目录中
     docker run --rm \
         -v shared-data:/node-data \
         -v "${CONFIG_DIR}:/config" \
-        busybox sh -c "mkdir -p /node-data/node-info/${CONTAINER_NAME} && cp /config/nodeInfo.json /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json && chmod 600 /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json"
+        busybox sh -c "mkdir -p /node-data/node-info/${u} && cp /config/${NODE_INFO_FILENAME} /node-data/node-info/${u}/${NODE_INFO_FILENAME} && chmod 600 /node-data/node-info/${u}/${NODE_INFO_FILENAME}"
 
     # 验证复制是否成功
-    docker run --rm -v shared-data:/node-data busybox sh -c "test -f /node-data/node-info/${CONTAINER_NAME}/nodeInfo.json"
+    docker run --rm -v shared-data:/node-data busybox sh -c "test -f /node-data/node-info/${u}/${NODE_INFO_FILENAME}"
     if [ $? -eq 0 ]; then
-        log_info "nodeInfo.json 已成功复制到共享卷的 node-info/${CONTAINER_NAME}/ 目录。"
+        log_info "${NODE_INFO_FILENAME} 已成功复制到共享卷的 node-info/${u}/ 目录。"
     else
-        log_error "将 nodeInfo.json 复制到共享卷失败。"
+        log_error "将 ${NODE_INFO_FILENAME} 复制到共享卷失败。"
         exit 1
     fi
 
     # 输出节点信息和生成二维码
-    display_node_info_with_qr "${CONFIG_DIR}/nodeInfo.json"
+    display_node_info_with_qr "${CONFIG_DIR}/${NODE_INFO_FILENAME}"
 }
 
 # 主函数
