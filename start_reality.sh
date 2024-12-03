@@ -242,11 +242,11 @@ process_config_file() {
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
-    DOMAIN_NAME=$(jq -r '.n' "$CONFIG_FILE")  # 从 JSON 文件中读取 "n"
+    DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "n"
 
     # 获取 "u" 字段的值，用于目录名
     u=$(jq -r '.u' "$CONFIG_FILE")
-    n=$(jq -r '.n' "$CONFIG_FILE")
+    s=$(jq -r '.s' "$CONFIG_FILE")
 
     # 添加域名后缀
     DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
@@ -468,7 +468,7 @@ process_config_file() {
             --arg expire "${EXPIRE_DATE_ISO:-}" \
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
-            --arg n "$DOMAIN_NAME" \
+            --arg server "$DOMAIN_NAME" \
             --arg uid "$URL_ID" \
             '{
                 user: $user,
@@ -476,14 +476,14 @@ process_config_file() {
                 expire: $expire,
                 subscription: $subscription,
                 country: $country,
-                n: $n,
+                server: $server,
                 uid: $uid
             }')
         NODE_INFO_LIST+=("$node_info_json")
     done
 
     # 定义 nodeInfo 文件名为 nodeInfo-<n>.json
-    NODE_INFO_FILENAME="nodeInfo-${n}.json"
+    NODE_INFO_FILENAME="nodeInfo-${s}.json"
 
     # 生成 nodeInfo-<n>.json 文件
     NODE_INFO_JSON=$(printf '%s\n' "${NODE_INFO_LIST[@]}" | jq -s '.')
@@ -497,14 +497,14 @@ process_config_file() {
     log_info "${NODE_INFO_FILENAME} 文件已成功创建。"
 
     # 将 nodeInfo-<n>.json 拷贝到容器根目录
-    docker cp "${CONFIG_DIR}/${NODE_INFO_FILENAME}" "${CONTAINER_NAME}:/nodeInfo-${n}.json"
+    docker cp "${CONFIG_DIR}/${NODE_INFO_FILENAME}" "${CONTAINER_NAME}:/nodeInfo-${s}.json"
     if [ $? -ne 0 ]; then
         log_error "将 ${NODE_INFO_FILENAME} 拷贝到容器失败。"
         exit 1
     fi
 
     # 检查是否成功拷贝
-    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo-${n}.json; then
+    if docker exec "${CONTAINER_NAME}" test -f /nodeInfo-"${s}".json; then
         log_info "已成功将 ${NODE_INFO_FILENAME} 拷贝到容器的根目录。"
     else
         log_error "将 ${NODE_INFO_FILENAME} 拷贝到容器失败。"
@@ -566,7 +566,6 @@ main() {
             i) URL_ID="$OPTARG";;
             p) PORT="$OPTARG";;
             d) DIRECTORY="$OPTARG";;
-            m) MONTH_COUNT="$OPTARG";;
             c) CPU_LIMIT="$OPTARG";;
             M) MEMORY_LIMIT="$OPTARG";;
             e) EXPIRE_DATE="$OPTARG";;

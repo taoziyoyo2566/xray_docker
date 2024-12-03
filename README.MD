@@ -32,3 +32,9 @@ ssh-keygen -t rsa -b 2048 -C "spartan@taoziyoyo.com"
 ssh-copy-id -i ~/.ssh/id_rsa.pub zgo
 
 0 2 * * * /home/spartan/workspace/xray_docker.sh >> /var/log/sync_reality.log 2>&1
+
+
+replace
+for file in *.json; do
+jq 'with_entries(if .key == "n" then .key = "s" else . end)' "$file" > temp && mv temp "$file"
+done
