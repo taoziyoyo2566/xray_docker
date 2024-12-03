@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 定义同步的源服务器列表
-SOURCE_SERVERS=("bwh" "alpha")
+# 默认源服务器列表为空
+SOURCE_SERVERS=()
 
 # 定义同步的目标目录
 TARGET_DIR="/opt/docker/reality/nodeInfo/"
@@ -18,6 +18,25 @@ get_reality_dirs() {
     local server=$1
     ssh $SSH_OPTS "$server" "find /opt/docker/reality/nodeInfo/ -maxdepth 1 -type d -name 'reality_*' -printf '%f\n'"
 }
+
+# 解析命令行参数
+while getopts "s:" opt; do
+    case $opt in
+        s)
+            IFS=',' read -ra SOURCE_SERVERS <<< "$OPTARG"
+            ;;
+        *)
+            echo "Usage: $0 -s server1,server2,server3"
+            exit 1
+            ;;
+    esac
+done
+
+# 检查是否提供了服务器列表
+if [ ${#SOURCE_SERVERS[@]} -eq 0 ]; then
+    echo "请通过 -s 参数指定源服务器列表，例如：$0 -s bwh,alpha,zgo"
+    exit 1
+fi
 
 # 循环遍历每个源服务器进行同步
 for SERVER in "${SOURCE_SERVERS[@]}"; do

@@ -26,3 +26,9 @@ bash user_config.sh --transfer -n spt -d client_alp_202412021515
 bash user_config.sh -n alp  --transfer
 
 bash start_reality.sh -d client_date
+
+
+ssh-keygen -t rsa -b 2048 -C "spartan@taoziyoyo.com"
+ssh-copy-id -i ~/.ssh/id_rsa.pub zgo
+
+0 2 * * * /home/spartan/workspace/xray_docker.sh >> /var/log/sync_reality.log 2>&1
