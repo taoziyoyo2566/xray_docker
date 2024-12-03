@@ -469,7 +469,7 @@ process_config_file() {
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
             --arg n "$DOMAIN_NAME" \
-            --arg region "$REGION" \
+            --arg uid "$URL_ID" \
             '{
                 user: $user,
                 id: $id,
@@ -477,7 +477,7 @@ process_config_file() {
                 subscription: $subscription,
                 country: $country,
                 n: $n,
-                region: $region
+                uid: $uid
             }')
         NODE_INFO_LIST+=("$node_info_json")
     done
