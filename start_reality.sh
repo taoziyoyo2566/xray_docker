@@ -469,13 +469,15 @@ process_config_file() {
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
             --arg n "$DOMAIN_NAME" \
+            --arg region "$REGION" \
             '{
                 user: $user,
                 id: $id,
                 expire: $expire,
                 subscription: $subscription,
                 country: $country,
-                n: $n
+                n: $n,
+                region: $region
             }')
         NODE_INFO_LIST+=("$node_info_json")
     done
@@ -543,6 +545,7 @@ main() {
     check_and_install docker docker.io
     check_and_install netstat net-tools
     check_and_install curl curl
+    check_and_install rsync rsync
 
     # 初始化变量，设置默认值
     USERS=""
