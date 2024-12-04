@@ -18,16 +18,13 @@ for file in client/*.json; do sed -i.bak 's/"r": "ALPSHA"/"r": "SPTSHA"/g; s/"n"
 
 
 bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu
-bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -g chatgpt 
+bash user_config.sh --new -s spt -u han,kyler,iceberg,qin,ceci,night,jack -g chatgpt 
 bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -g me 
 
-bash user_config.sh --new -s spt -u han,kyler,iceberg,qin,ceci,night,jack
 bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -d client_alp_202412021515
-
 
 -- add users to specified folder
 bash user_config.sh -s alp --add -u test,test2,test -d client_spt_202412041016
-
 
 --- transfer
 bash user_config.sh --transfer -n spt -d client_alp_202412021515
