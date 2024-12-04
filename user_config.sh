@@ -21,10 +21,11 @@ show_help() {
     log_info "  -s|--server       设置服务器 (必需)"
     log_info "  -u|--users        设置用户列表（用逗号分隔，创建新文件或添加用户时必需）"
     log_info "  -d|--directory    指定目录路径 (创建新文件时为输出目录的基准名, 修改现有文件时为源目录)"
-    log_info "  -g|--group         设置组名（仅在 --new 模式下使用，拼接到生成的目录名上）"
+    log_info "  -g|--group         设置组名（仅在 --new 和 --transfer 模式下使用，拼接到生成的目录名上）"
     log_info "  --new             创建新的 JSON 配置文件"
     log_info "  --transfer        修改现有的 JSON 配置文件"
     log_info "  --add             向指定目录添加多个用户的 JSON 配置文件"
+    log_info "  --force           强制覆盖文件，不提示用户确认"
     log_info "  -h|--help         显示帮助信息"
 }
 
@@ -48,18 +49,39 @@ create_directory() {
     local base_dir="$1"
     local group="$2"
     local date_part
-    date_part=$(echo "$base_dir" | grep -oE '[0-9]{12}')
-    if [[ -z "$date_part" ]]; then
-        date_part=$(date +%Y%m%d%H%M)
-        log_info "未在基准目录名中找到日期部分，使用当前时间: $date_part"
-    else
-        log_info "提取到的日期部分: $date_part"
-    fi
+    local server_extracted
+
+    # 移除尾部斜杠
+    base_dir="${base_dir%/}"
 
     if [[ -n "$group" ]]; then
-        local dir_name="client_${group}_${server}_${date_part}"
+        # Group is provided, use it directly
+        date_part=$(echo "$base_dir" | grep -oE '[0-9]{12}')
+        if [[ -z "$date_part" ]]; then
+            date_part=$(date +%Y%m%d%H%M)
+            log_info "未在基准目录名中找到日期部分，使用当前时间: $date_part"
+        else
+            log_info "提取到的日期部分: $date_part"
+        fi
+        local dir_name="client_${server}_${group}_${date_part}"
     else
-        local dir_name="client_${server}_${date_part}"
+        # Try to extract group and server from base_dir
+        if [[ "$base_dir" =~ ^client_([^_]+)_([^_]+)_([0-9]{12})$ ]]; then
+            server_extracted="${BASH_REMATCH[1]}"
+            group="${BASH_REMATCH[2]}"
+            date_part="${BASH_REMATCH[3]}"
+            log_info "从目录名中提取到组名: $group 和服务器: $server_extracted"
+            local dir_name="client_${server}_${group}_${date_part}"
+        else
+            date_part=$(echo "$base_dir" | grep -oE '[0-9]{12}')
+            if [[ -z "$date_part" ]]; then
+                date_part=$(date +%Y%m%d%H%M)
+                log_info "未在基准目录名中找到日期部分，使用当前时间: $date_part"
+            else
+                log_info "提取到的日期部分: $date_part"
+            fi
+            local dir_name="client_${server}_${date_part}"
+        fi
     fi
 
     mkdir -p "$dir_name"
@@ -102,6 +124,10 @@ modify_json_files() {
 prompt_overwrite() {
     local file="$1"
     if [ -f "$file" ]; then
+        if $force_overwrite; then
+            log_info "强制覆盖文件: $file"
+            return 0
+        fi
         while true; do
             read -p "文件 $file 已存在，是否覆盖？(y/n): " choice
             case "$choice" in
@@ -159,6 +185,7 @@ main() {
     mode=""
     directory=""
     group=""
+    force_overwrite=false
 
     # 检查 jq 是否安装
     if ! command -v jq >/dev/null 2>&1; then
@@ -217,6 +244,10 @@ main() {
                 mode="add"
                 shift # past argument
                 ;;
+            --force)
+                force_overwrite=true
+                shift # past argument
+                ;;
             -h|--help)
                 show_help
                 exit 0
@@ -258,7 +289,7 @@ main() {
             fi
             IFS=',' read -ra ADDR <<< "$users"
             for user in "${ADDR[@]}"; do
-                local target_file="$dir_name/$user.json"
+                target_file="$dir_name/$user.json"
                 if prompt_overwrite "$target_file"; then
                     port=$(generate_random_port)
                     id=$(generate_random_id)
@@ -302,17 +333,11 @@ EOF
                 log_info "提取到的日期部分: $date_part"
             fi
             # 创建目标目录
-            if [[ -n "$group" ]]; then
-                target_dir="client_${group}_${server}_${date_part}"
-            else
-                target_dir="client_${server}_${date_part}"
-            fi
-            mkdir -p "$target_dir"
+            target_dir=$(create_directory "$directory" "$group")
             if [[ $? -ne 0 ]]; then
                 log_error "无法创建目标目录: $target_dir"
                 exit 1
             fi
-            log_info "已创建目标目录: $target_dir"
             if [[ -n "$users" ]]; then
                 # 修改指定用户
                 IFS=',' read -ra ADDR <<< "$users"
