@@ -16,25 +16,40 @@ for file in client/*.json; do sed -i 's/"r": "ALPSHA"/"r": "SPTSHA"/g; s/"n": "a
 如果文件数量较多且需要备份，您可以在 sed 中添加备份选项，例如 -i.bak，生成备份文件：
 for file in client/*.json; do sed -i.bak 's/"r": "ALPSHA"/"r": "SPTSHA"/g; s/"n": "alp"/"n": "spt"/g' "$file"; done
 
-bash user_config.sh -n alp -u cpp,frank,taoziyoyo,shm,szm,yinlu --new
 
-bash user_config.sh --new -n alp -u cpp,frank,taoziyoyo,shm,szm,yinlu
-bash user_config.sh --new -n spt -u cpp,frank,taoziyoyo,shm,szm,yinlu -d client_alp_202412021515
+bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu
+bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -g chatgpt 
+bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -g me 
 
+bash user_config.sh --new -s spt -u han,kyler,iceberg,qin,ceci,night,jack
+bash user_config.sh --new -s spt -u cpp,frank,shm,szm,yinlu -d client_alp_202412021515
+
+
+-- add users to specified folder
+bash user_config.sh -s alp --add -u test,test2,test -d client_spt_202412041016
+
+
+--- transfer
 bash user_config.sh --transfer -n spt -d client_alp_202412021515
-
 bash user_config.sh -n alp  --transfer
 
-bash start_reality.sh -d client_date
+---run
+bash start_reality.sh -d client_alp_202412021515
 
 
 ssh-keygen -t rsa -b 2048 -C "spartan@taoziyoyo.com"
 ssh-copy-id -i ~/.ssh/id_rsa.pub zgo
 
-0 2 * * * /home/spartan/workspace/xray_docker.sh >> /var/log/sync_reality.log 2>&1
 
 
 replace
 for file in *.json; do
 jq 'with_entries(if .key == "n" then .key = "s" else . end)' "$file" > temp && mv temp "$file"
 done
+
+
+delete latest 5 docker instances
+docker ps -a --format "{{.CreatedAt}}\t{{.ID}}" | sort -r | head -n 7 | cut -f2 | xargs docker rm
+
+---rsync
+bash rsync.sh -s rnc,alpha

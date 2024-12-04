@@ -19,10 +19,12 @@ show_help() {
     log_info ""
     log_info "Options:"
     log_info "  -s|--server       设置服务器 (必需)"
-    log_info "  -u|--users        设置用户列表（用逗号分隔，创建新文件时必需）"
+    log_info "  -u|--users        设置用户列表（用逗号分隔，创建新文件或添加用户时必需）"
     log_info "  -d|--directory    指定目录路径 (创建新文件时为输出目录的基准名, 修改现有文件时为源目录)"
+    log_info "  -g|--group         设置组名（仅在 --new 模式下使用，拼接到生成的目录名上）"
     log_info "  --new             创建新的 JSON 配置文件"
     log_info "  --transfer        修改现有的 JSON 配置文件"
+    log_info "  --add             向指定目录添加多个用户的 JSON 配置文件"
     log_info "  -h|--help         显示帮助信息"
 }
 
@@ -38,12 +40,13 @@ generate_random_id() {
 
 # Function to calculate the expiration date one year from today
 calculate_expiration_date() {
-    date -d "+1 year" +%Y%m%d
+    date -d "+100 year" +%Y%m%d
 }
 
-# Create directory with server and date part
+# Create directory with server, group (optional), and date part
 create_directory() {
     local base_dir="$1"
+    local group="$2"
     local date_part
     date_part=$(echo "$base_dir" | grep -oE '[0-9]{12}')
     if [[ -z "$date_part" ]]; then
@@ -52,7 +55,13 @@ create_directory() {
     else
         log_info "提取到的日期部分: $date_part"
     fi
-    local dir_name="client_${server}_${date_part}"
+
+    if [[ -n "$group" ]]; then
+        local dir_name="client_${group}_${server}_${date_part}"
+    else
+        local dir_name="client_${server}_${date_part}"
+    fi
+
     mkdir -p "$dir_name"
     if [[ $? -ne 0 ]]; then
         log_error "无法创建目标目录: $dir_name"
@@ -62,7 +71,7 @@ create_directory() {
     echo "$dir_name"
 }
 
-# Modify the "r" and "n" fields in existing JSON files
+# Modify the "r" and "s" fields in existing JSON files
 modify_json_files() {
     local user="$1"
     local source_dir="$2"
@@ -73,12 +82,11 @@ modify_json_files() {
         log_info "正在处理文件: $file"
         # 提取用户名前三个字符并转换为大写
         user_prefix_upper=$(echo "${user:0:3}" | tr '[:lower:]' '[:upper:]')
-        # 使用 jq 修改 "r" 和 "n" 字段
-        # 使用 jq 修改 JSON：更新 "r" 字段，新增 "s" 字段，移除 "n" 字段
+        # 使用 jq 修改 "r" 和 "s" 字段
         jq --arg ref "${server^^}${user_prefix_upper}" \
-                   --arg server "$server" \
-                   '.r = $ref | .s = $server' \
-                   "$file" > "${target_dir}/${user}.json"
+           --arg server "$server" \
+           '.r = $ref | .s = $server' \
+           "$file" > "${target_dir}/${user}.json"
 
         if [ $? -eq 0 ]; then
             log_info "已修改并保存文件: ${target_dir}/${user}.json"
@@ -90,6 +98,59 @@ modify_json_files() {
     fi
 }
 
+# Prompt before overwriting an existing file
+prompt_overwrite() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        while true; do
+            read -p "文件 $file 已存在，是否覆盖？(y/n): " choice
+            case "$choice" in
+                y|Y ) return 0 ;;
+                n|N )
+                    log_info "跳过 $file 文件。"
+                    return 1 ;;
+                * )
+                    log_error "无效的选择，请输入 y 或 n。"
+                    ;;
+            esac
+        done
+    else
+        return 0
+    fi
+}
+
+# Add multiple users to an existing directory
+add_users_to_directory() {
+    local users="$1"
+    local target_dir="$2"
+    IFS=',' read -ra USER_ARRAY <<< "$users"
+    for user in "${USER_ARRAY[@]}"; do
+        local target_file="${target_dir}/${user}.json"
+        if prompt_overwrite "$target_file"; then
+            port=$(generate_random_port)
+            id=$(generate_random_id)
+            expiration=$(calculate_expiration_date)
+            ref=$(echo "${server}${user:0:3}" | tr '[:lower:]' '[:upper:]')
+            # 生成 JSON 文件
+            cat > "$target_file" <<EOF
+{
+  "u": "$user",
+  "p": "$port",
+  "i": "$id",
+  "e": "$expiration",
+  "r": "$ref",
+  "s": "$server"
+}
+EOF
+            if [ $? -eq 0 ]; then
+                log_info "已生成文件: $target_file"
+            else
+                log_error "生成文件失败: $target_file"
+            fi
+        fi
+    done
+}
+
 # 主函数
 main() {
     # 初始化变量，设置默认值
@@ -97,6 +158,7 @@ main() {
     users=""
     mode=""
     directory=""
+    group=""
 
     # 检查 jq 是否安装
     if ! command -v jq >/dev/null 2>&1; then
@@ -123,12 +185,36 @@ main() {
                 shift # past argument
                 shift # past value
                 ;;
+            -g|--group)
+                group="$2"
+                shift # past argument
+                shift # past value
+                ;;
             --new)
+                if [[ -n "$mode" ]]; then
+                    log_error "只能指定一个操作模式（--new, --transfer, --add）。"
+                    show_help
+                    exit 1
+                fi
                 mode="new"
                 shift # past argument
                 ;;
             --transfer)
+                if [[ -n "$mode" ]]; then
+                    log_error "只能指定一个操作模式（--new, --transfer, --add）。"
+                    show_help
+                    exit 1
+                fi
                 mode="transfer"
+                shift # past argument
+                ;;
+            --add)
+                if [[ -n "$mode" ]]; then
+                    log_error "只能指定一个操作模式（--new, --transfer, --add）。"
+                    show_help
+                    exit 1
+                fi
+                mode="add"
                 shift # past argument
                 ;;
             -h|--help)
@@ -151,7 +237,7 @@ main() {
     fi
 
     if [[ -z "$mode" ]]; then
-        log_error "必须指定操作模式，使用 --new 或 --transfer。"
+        log_error "必须指定操作模式，使用 --new, --transfer 或 --add。"
         show_help
         exit 1
     fi
@@ -164,33 +250,36 @@ main() {
                 exit 1
             fi
             if [[ -z "$directory" ]]; then
-                # 自动创建目录，包含服务器和时间戳
-                dir_name=$(create_directory "")
+                # 自动创建目录，包含服务器、组名（如果有）和时间戳
+                dir_name=$(create_directory "" "$group")
             else
-                # 使用指定的目录名作为基准，提取日期部分
-                dir_name=$(create_directory "$directory")
+                # 使用指定的目录名作为基准，提取日期部分，并包含组名（如果有）
+                dir_name=$(create_directory "$directory" "$group")
             fi
             IFS=',' read -ra ADDR <<< "$users"
             for user in "${ADDR[@]}"; do
-                port=$(generate_random_port)
-                id=$(generate_random_id)
-                expiration=$(calculate_expiration_date)
-                ref=$(echo "${server}${user:0:3}" | tr '[:lower:]' '[:upper:]')
-                # 生成 JSON 文件
-                cat > "$dir_name/$user.json" <<EOF
+                local target_file="$dir_name/$user.json"
+                if prompt_overwrite "$target_file"; then
+                    port=$(generate_random_port)
+                    id=$(generate_random_id)
+                    expiration=$(calculate_expiration_date)
+                    ref=$(echo "${server}${user:0:3}" | tr '[:lower:]' '[:upper:]')
+                    # 生成 JSON 文件
+                    cat > "$target_file" <<EOF
 {
   "u": "$user",
   "p": "$port",
   "i": "$id",
   "e": "$expiration",
   "r": "$ref",
-  "n": "$server"
+  "s": "$server"
 }
 EOF
-                if [ $? -eq 0 ]; then
-                    log_info "已生成文件: $dir_name/$user.json"
-                else
-                    log_error "生成文件失败: $dir_name/$user.json"
+                    if [ $? -eq 0 ]; then
+                        log_info "已生成文件: $target_file"
+                    else
+                        log_error "生成文件失败: $target_file"
+                    fi
                 fi
             done
             ;;
@@ -213,7 +302,11 @@ EOF
                 log_info "提取到的日期部分: $date_part"
             fi
             # 创建目标目录
-            target_dir="client_${server}_${date_part}"
+            if [[ -n "$group" ]]; then
+                target_dir="client_${group}_${server}_${date_part}"
+            else
+                target_dir="client_${server}_${date_part}"
+            fi
             mkdir -p "$target_dir"
             if [[ $? -ne 0 ]]; then
                 log_error "无法创建目标目录: $target_dir"
@@ -235,6 +328,18 @@ EOF
                     fi
                 done
             fi
+            ;;
+        "add")
+            if [[ -z "$users" || -z "$directory" ]]; then
+                log_error "添加新用户时，必须同时指定用户和目录。"
+                show_help
+                exit 1
+            fi
+            if [[ ! -d "$directory" ]]; then
+                log_error "指定的目录不存在: $directory"
+                exit 1
+            fi
+            add_users_to_directory "$users" "$directory"
             ;;
         *)
             log_error "未知的操作模式: $mode"

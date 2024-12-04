@@ -1,16 +1,16 @@
 #!/bin/bash
 set -o pipefail
 
-# 定义日志文件，位于当前目录，带有时间戳
-LOGFILE="$(pwd)/script_log_$(date +%Y%m%d%H%M%S).log"
+# 定义固定的日志文件名
+LOGFILE="start_reality.log"
 
-# 日志函数，将输出重定向到日志文件和标准错误
+# 日志函数，将输出重定向到日志文件和标准错误，并添加时间戳
 log_info() {
-    echo -e "\033[32m[INFO]\033[0m $1" | tee -a "$LOGFILE" >&2
+    echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1" | tee -a "$LOGFILE" >&2
 }
 
 log_error() {
-    echo -e "\033[31m[ERROR]\033[0m $1" | tee -a "$LOGFILE" >&2
+    echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" | tee -a "$LOGFILE" >&2
 }
 
 # 显示帮助信息的函数，使用 log_info 输出
@@ -222,6 +222,27 @@ display_node_info_with_qr() {
     done
 }
 
+# Prompt before overwriting an existing file
+prompt_overwrite() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        while true; do
+            read -p "文件 $file 已存在，是否覆盖？(y/n): " choice
+            case "$choice" in
+                y|Y ) return 0 ;;
+                n|N )
+                    log_info "跳过 $file 文件。"
+                    return 1 ;;
+                * )
+                    log_error "无效的选择，请输入 y 或 n。"
+                    ;;
+            esac
+        done
+    else
+        return 0
+    fi
+}
+
 # 处理单个配置文件的函数
 process_config_file() {
     local CONFIG_FILE="$1"
@@ -242,7 +263,7 @@ process_config_file() {
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
-    DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "n"
+    DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "s"
 
     # 获取 "u" 字段的值，用于目录名
     u=$(jq -r '.u' "$CONFIG_FILE")
@@ -252,9 +273,6 @@ process_config_file() {
     DOMAIN_SUFFIX="o9drrm5l1d7uopaguucnxohzc3ul2yazxrldzpuoduu.taoziyoyo.com"
     DOMAIN_NAME_FULL="${DOMAIN_NAME}${DOMAIN_SUFFIX}"
 
-    # 如果命令行没有提供 REGION，从配置文件获取
-    # REGION="${REGION:-TESTUS}"  # 已移除，因为 'r' 从 JSON 文件中读取
-
     # 验证 USERS
     if [ -z "$USERS" ]; then
         log_error "必须指定用户列表，使用 -u 参数或在配置文件中指定。"
@@ -263,7 +281,7 @@ process_config_file() {
 
     # 验证 DOMAIN_NAME
     if [ -z "$DOMAIN_NAME_FULL" ]; then
-        log_error "必须指定域名，使用 -n 参数或在配置文件中指定。"
+        log_error "必须指定域名，使用 -s 参数或在配置文件中指定。"
         exit 1
     fi
 
