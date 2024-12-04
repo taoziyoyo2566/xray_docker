@@ -37,6 +37,8 @@ bash start_reality.sh -d client_alp_202412021515
 ssh-keygen -t rsa -b 2048 -C "spartan@taoziyoyo.com"
 ssh-copy-id -i ~/.ssh/id_rsa.pub zgo
 
+---execute
+bash remote_execute.sh -s bwh:bwh alpha:alp rn:rnc 
 
 
 replace
