@@ -41,23 +41,25 @@ echo '[$SSH_ALIAS] 进入 workspace/xray_docker 目录'
 # 删除以 server_alias 开头的客户端目录
 rm -rf client_${SERVER_ALIAS}_*
 echo '[$SSH_ALIAS] 删除 client_${SERVER_ALIAS}_* 目录'
-
+rm -rf /opt/docker/reality/nodeInfo/*
+echo '[$SSH_ALIAS] 删除 /opt/docker/reality/nodeInfo/reality_* 目录'
 # 更新代码库
 git pull
 echo '[$SSH_ALIAS] 执行 git pull'
 
 # 执行 user_config.sh 脚本
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_chatgpt_202412041334
 echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_chatgpt_202412041334'
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_chatgpt_202412041334
 
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_sub_202412041334
 echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_sub_202412041334'
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_sub_202412041334
 
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_me_202412041334
 echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_me_202412041334'
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_me_202412041334
 
 # 删除以 reality_ 开头的 Docker 容器，确保有容器ID再执行删除
 containers=\$(docker ps -a --filter \"name=^reality_\" -q)
+
 if [ -n \"\$containers\" ]; then
     docker rm -f \$containers
     echo '[$SSH_ALIAS] 删除所有以 reality_ 开头的 Docker 容器'
