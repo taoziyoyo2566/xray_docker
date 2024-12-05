@@ -49,13 +49,13 @@ echo '[$SSH_ALIAS] 执行 git pull'
 
 # 执行 user_config.sh 脚本
 echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_chatgpt_202412041334'
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_chatgpt_202412041334
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_zgo_chatgpt_202412041334
 
-echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_sub_202412041334'
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_sub_202412041334
+echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_zgo_sub_202412041334'
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_zgo_sub_202412041334
 
-echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_me_202412041334'
-bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_spt_me_202412041334
+echo '[$SSH_ALIAS] 执行 user_config.sh --transfer -s ${SERVER_ALIAS} -d client_zgo_me_202412041334'
+bash user_config.sh --transfer -s ${SERVER_ALIAS} -d client_zgo_me_202412041334
 
 # 删除以 reality_ 开头的 Docker 容器，确保有容器ID再执行删除
 containers=\$(docker ps -a --filter \"name=^reality_\" -q)
