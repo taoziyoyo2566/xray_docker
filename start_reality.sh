@@ -96,7 +96,7 @@ generate_x25519_keys() {
         fi
         log_info "密钥生成容器 '${CONTAINER_NAME}' 已创建。"
         # 等待容器启动
-        sleep 2
+        sleep 5
     fi
 
     # 调用 Xray 容器生成 X25519 密钥对

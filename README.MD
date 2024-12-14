@@ -48,7 +48,9 @@ done
 
 
 delete latest 5 docker instances
+docker rm -f $(docker ps -a --filter "name=^reality_" -q)
 docker ps -a --format "{{.CreatedAt}}\t{{.ID}}" | sort -r | head -n 7 | cut -f2 | xargs docker rm
 
 ---rsync
 bash rsync.sh -s rnc,alpha
+
