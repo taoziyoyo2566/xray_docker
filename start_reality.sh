@@ -381,6 +381,12 @@ process_config_file() {
     CONFIG_DIR="/opt/docker/reality/nodeInfo/reality_${u}"
     mkdir -p "${CONFIG_DIR}/log"
 
+    # 检查是否已经存在同名容器
+    if docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        log_info "容器 ${CONTAINER_NAME} 已存在，跳过创建。"
+        return
+    fi
+
     # 将 CLIENTS_JSON 写入 users.json
     echo "$CLIENTS_JSON" > "${CONFIG_DIR}/users.json"
 
@@ -435,7 +441,7 @@ process_config_file() {
       --log-opt max-size=50m \
       --cpus="$CPU_LIMIT" \
       --memory="$MEMORY_LIMIT" \
-      -p "$PORT:443" \
+      -p "91.230.73.51:$PORT:443" \
       -e EXTERNAL_PORT="$PORT" \
       --env REGION="$REGION" \
       --env URL_ID="$URL_ID" \
@@ -478,15 +484,19 @@ process_config_file() {
 
         # 调用 get_country 方法并打印结果
         COUNTRY=$(get_country)
-
+#        CREATE_TIME=`date +"%Y-%m-%d %H:%M:%S"`
+        CREATE_TIME=$(date +"%Y-%m-%dT%H:%M:%S")
+#        EXPIRE_DATE_FORMATTED=$(date -d "${EXPIRE_DATE_ISO}" +"%Y-%m-%d %H:%M:%S")
+        EXPIRE_DATE_FORMATTED=$(date -d "${EXPIRE_DATE_ISO}" -u +"%Y-%m-%dT%H:%M:%SZ")
         # 添加到 nodeInfo-<n>.json 数据中
         node_info_json=$(jq -n \
             --arg user "$email" \
             --arg id "$uuid" \
-            --arg expire "${EXPIRE_DATE_ISO:-}" \
+            --arg expire "$EXPIRE_DATE_FORMATTED" \
             --arg subscription "$SUB_LINK" \
             --arg country "$COUNTRY" \
             --arg server "$DOMAIN_NAME" \
+            --arg updateDate "$CREATE_TIME" \
             --arg uid "$URL_ID" \
             '{
                 user: $user,
@@ -495,6 +505,7 @@ process_config_file() {
                 subscription: $subscription,
                 country: $country,
                 server: $server,
+                updateDate: $updateDate,
                 uid: $uid
             }')
         NODE_INFO_LIST+=("$node_info_json")
@@ -568,7 +579,6 @@ main() {
     # 初始化变量，设置默认值
     USERS=""
     PORT=""
-    MONTH_COUNT=""
     REGION=""  # 移除 -r 参数
     CPU_LIMIT="0.5"    # 默认 CPU 限制
     MEMORY_LIMIT="300m" # 默认内存限制
