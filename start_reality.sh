@@ -258,12 +258,12 @@ process_config_file() {
 
     # 解析 JSON 文件
     USERS=$(jq -r '.u' "$CONFIG_FILE")
-    USERS="${USERS}@taoziyoyo.com"
     PORT=$(jq -r '.p' "$CONFIG_FILE")
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
     DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "s"
+    USERS="${USERS}.${DOMAIN_NAME}@taoziyoyo.com"
 
     # 获取 "u" 字段的值，用于目录名
     u=$(jq -r '.u' "$CONFIG_FILE")
@@ -479,6 +479,7 @@ process_config_file() {
     for user_info in "${USER_INFO_LIST[@]}"; do
         email=$(echo "$user_info" | cut -d'|' -f1)
         uuid=$(echo "$user_info" | cut -d'|' -f2)
+        $email
         encoded_email=$(urlencode "$email")
         SUB_LINK="vless://${uuid}@${DOMAIN_NAME_FULL}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
 
