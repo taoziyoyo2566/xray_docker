@@ -435,13 +435,15 @@ process_config_file() {
         .inbounds[0].streamSettings.realitySettings.shortIds = [$shortId]' \
        "${CONFIG_DIR}/config.json" > "${CONFIG_DIR}/config_tmp.json" && mv "${CONFIG_DIR}/config_tmp.json" "${CONFIG_DIR}/config.json"
 
+    # ipv4
+    ipv4=$(curl -4 -sSL --connect-timeout 3 --retry 2  ip.sb || echo "null")
     # 构建 DOCKER_RUN_CMD
     DOCKER_RUN_CMD=(docker run -d --name "$CONTAINER_NAME" \
       --restart=always \
       --log-opt max-size=50m \
       --cpus="$CPU_LIMIT" \
       --memory="$MEMORY_LIMIT" \
-      -p "91.230.73.51:$PORT:443" \
+      -p "$ipv4:$PORT:443" \
       -e EXTERNAL_PORT="$PORT" \
       --env REGION="$REGION" \
       --env URL_ID="$URL_ID" \
