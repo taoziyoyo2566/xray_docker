@@ -2,7 +2,12 @@
 set -o pipefail
 
 # 定义固定的日志文件名
-LOGFILE="user_config.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LOG_DIR="${SCRIPT_DIR}/logs"
+LOGFILE="${LOG_DIR}/user_config_$(date '+%Y%m%d').log"
+
+# 确保日志目录存在
+mkdir -p "$LOG_DIR"
 
 # 日志函数，将输出重定向到日志文件和标准错误，并添加时间戳
 log_info() {

@@ -2,8 +2,13 @@
 set -e  # 遇到错误立即退出
 set -o pipefail  # 管道命令中的错误也会导致脚本退出
 
-# 定义固定的日志文件名
-LOGFILE="rsync.log"
+# 定义日志相关路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LOG_DIR="${SCRIPT_DIR}/logs"
+LOGFILE="${LOG_DIR}/rsync_$(date '+%Y%m%d').log"
+
+# 确保日志目录存在
+mkdir -p "$LOG_DIR"
 
 # 日志函数
 log_info() {
@@ -50,6 +55,8 @@ fi
 # 定义源目录和目标目录
 SOURCE_DIR="/opt/docker/reality/nodeInfo/"
 TARGET_DIR="/opt/docker/reality/nodeInfo/"
+# 定义备份目录
+BACKUP_DIR="/opt/docker/reality/nodeInfo_backup"
 
 # 定义 SSH 参数
 SSH_KEY="$HOME/.ssh/id_rsa"
@@ -71,17 +78,8 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# 检查源目录中是否有 reality_* 目录和所需的文件
-if ! find "$SOURCE_DIR" -type d -name "reality_*" | grep -q .; then
-    log_error "源目录中没有找到 reality_* 目录"
-    exit 1
-fi
-
-# 检查 reality_* 目录中是否有 nodeInfo*.json 文件
-if ! find "$SOURCE_DIR" -path "*/reality_*/nodeInfo*.json" -type f | grep -q .; then
-    log_error "reality_* 目录中没有找到 nodeInfo*.json 文件"
-    exit 1
-fi
+# 清理一个月前的日志文件
+find "$LOG_DIR" -name "rsync_*.log" -mtime +30 -delete
 
 # 循环遍历每个目标服务器进行同步
 for SERVER in "${TARGET_SERVERS[@]}"; do
@@ -93,22 +91,39 @@ for SERVER in "${TARGET_SERVERS[@]}"; do
         continue
     fi
 
-    # 确保目标目录存在
-    if ! ssh $SSH_OPTS "$SERVER" "mkdir -p $TARGET_DIR"; then
-        log_error "在服务器 $SERVER 上创建目标目录失败"
+    # 确保目标目录和备份目录存在
+    if ! ssh $SSH_OPTS "$SERVER" "mkdir -p $TARGET_DIR $BACKUP_DIR"; then
+        log_error "在服务器 $SERVER 上创建目录失败"
         continue
     fi
 
-    # 使用 rsync 同步文件
+    # 在目标服务器上执行备份（排除log目录）
+    BACKUP_NAME="nodeInfo_$(date '+%Y%m%d_%H%M%S').tar.gz"
+    log_info "在服务器 $SERVER 上创建备份: $BACKUP_NAME"
+    if ! ssh $SSH_OPTS "$SERVER" "cd $TARGET_DIR/.. && tar --exclude='*/log/*' -czf $BACKUP_DIR/$BACKUP_NAME nodeInfo/"; then
+        log_error "在服务器 $SERVER 上创建备份失败"
+        continue
+    fi
+
+    # 首先执行 rsync 的 dry-run 来检查将要更新的文件
+    log_info "检查需要更新的文件..."
+    rsync -ainv --timeout=30 -e "ssh $SSH_OPTS" \
+        --exclude="*/log/*" \
+        "$SOURCE_DIR" "$SERVER:$TARGET_DIR" 2>&1 | grep -v "^$" | tee -a "$LOGFILE"
+
+    # 使用 rsync 同步文件，添加了一些优化参数
     if rsync -avz --timeout=30 -e "ssh $SSH_OPTS" \
-        --include="reality_*/" \
-        --include="reality_*/nodeInfo*.json" \
-        --exclude="*" \
+        --exclude="*/log/*" \
+        --checksum \
         "$SOURCE_DIR" "$SERVER:$TARGET_DIR" 2>&1 | tee -a "$LOGFILE"; then
         log_info "成功同步到 $SERVER"
     else
         log_error "同步到 $SERVER 失败"
     fi
+
+    # 检查并清理旧备份（可选，保留最近30天的备份）
+    log_info "清理超过30天的旧备份..."
+    ssh $SSH_OPTS "$SERVER" "find $BACKUP_DIR -name '*.tar.gz' -mtime +30 -delete"
 done
 
 log_info "同步任务完成！"

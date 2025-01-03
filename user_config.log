@@ -1152,3 +1152,92 @@
 [2024-12-04 13:41:16] [INFO] 正在处理文件: client_spt_me_202412041334//yinlu.json
 [2024-12-04 13:41:16] [INFO] 已修改并保存文件: client_rnc_me_202412041334/yinlu.json
 [2024-12-04 13:41:16] [INFO] 操作完成。
+[2025-01-02 23:37:54] [ERROR] jq 未安装，请先安装 jq。
+[2025-01-02 23:38:13] [INFO] 提取到的日期部分: 202412041334
+[2025-01-02 23:38:13] [INFO] 从目录名中提取到组名: me 和服务器: spt
+[2025-01-02 23:38:13] [INFO] 已创建目录: client_alp_me_202412041334
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//cpp.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/cpp.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//frank.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/frank.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//reap.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/reap.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//rsp.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/rsp.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//starry.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/starry.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//ybh.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/ybh.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//yhbb.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/yhbb.json
+[2025-01-02 23:38:13] [INFO] 正在处理文件: client_spt_me_202412041334//yhdd.json
+[2025-01-02 23:38:13] [INFO] 已修改并保存文件: client_alp_me_202412041334/yhdd.json
+[2025-01-02 23:38:13] [INFO] 操作完成。
+[2025-01-02 23:38:23] [INFO] 提取到的日期部分: 202412041334
+[2025-01-02 23:38:23] [INFO] 从目录名中提取到组名: chatgpt 和服务器: spt
+[2025-01-02 23:38:23] [INFO] 已创建目录: client_alp_chatgpt_202412041334
+[2025-01-02 23:38:23] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//ceci.json
+[2025-01-02 23:38:23] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/ceci.json
+[2025-01-02 23:38:23] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//han.json
+[2025-01-02 23:38:23] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/han.json
+[2025-01-02 23:38:23] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//iceberg.json
+[2025-01-02 23:38:23] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/iceberg.json
+[2025-01-02 23:38:23] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//jack.json
+[2025-01-02 23:38:24] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/jack.json
+[2025-01-02 23:38:24] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//kyler.json
+[2025-01-02 23:38:24] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/kyler.json
+[2025-01-02 23:38:24] [INFO] 正在处理文件: client_spt_chatgpt_202412041334//qin.json
+[2025-01-02 23:38:24] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/qin.json
+[2025-01-02 23:38:24] [INFO] 操作完成。
+[2025-01-02 23:38:37] [INFO] 提取到的日期部分: 202412041334
+[2025-01-02 23:38:37] [INFO] 从目录名中提取到组名: sub 和服务器: spt
+[2025-01-02 23:38:37] [INFO] 已创建目录: client_alp_sub_202412041334
+[2025-01-02 23:38:37] [INFO] 正在处理文件: client_spt_sub_202412041334//szm.json
+[2025-01-02 23:38:37] [INFO] 已修改并保存文件: client_alp_sub_202412041334/szm.json
+[2025-01-02 23:38:37] [INFO] 正在处理文件: client_spt_sub_202412041334//yinlu.json
+[2025-01-02 23:38:37] [INFO] 已修改并保存文件: client_alp_sub_202412041334/yinlu.json
+[2025-01-02 23:38:37] [INFO] 操作完成。
+[2025-01-03 05:53:12] [INFO] 提取到的日期部分: 202412041334
+[2025-01-03 05:53:12] [INFO] 从目录名中提取到组名: me 和服务器: spt
+[2025-01-03 05:53:12] [INFO] 已创建目录: client_alp_me_202412041334
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/cpp.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/cpp.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/frank.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/frank.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/reap.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/reap.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/rsp.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/rsp.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/starry.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/starry.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/ybh.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/ybh.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/yhbb.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/yhbb.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_me_202412041334/yhdd.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_me_202412041334/yhdd.json
+[2025-01-03 05:53:12] [INFO] 操作完成。
+[2025-01-03 05:53:12] [INFO] 提取到的日期部分: 202412041334
+[2025-01-03 05:53:12] [INFO] 从目录名中提取到组名: sub 和服务器: spt
+[2025-01-03 05:53:12] [INFO] 已创建目录: client_alp_sub_202412041334
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_sub_202412041334/szm.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_sub_202412041334/szm.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_sub_202412041334/yinlu.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_sub_202412041334/yinlu.json
+[2025-01-03 05:53:12] [INFO] 操作完成。
+[2025-01-03 05:53:12] [INFO] 提取到的日期部分: 202412041334
+[2025-01-03 05:53:12] [INFO] 从目录名中提取到组名: chatgpt 和服务器: spt
+[2025-01-03 05:53:12] [INFO] 已创建目录: client_alp_chatgpt_202412041334
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/ceci.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/ceci.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/han.json
+[2025-01-03 05:53:12] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/han.json
+[2025-01-03 05:53:12] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/iceberg.json
+[2025-01-03 05:53:13] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/iceberg.json
+[2025-01-03 05:53:13] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/jack.json
+[2025-01-03 05:53:13] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/jack.json
+[2025-01-03 05:53:13] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/kyler.json
+[2025-01-03 05:53:13] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/kyler.json
+[2025-01-03 05:53:13] [INFO] 正在处理文件: client_spt_chatgpt_202412041334/qin.json
+[2025-01-03 05:53:13] [INFO] 已修改并保存文件: client_alp_chatgpt_202412041334/qin.json
+[2025-01-03 05:53:13] [INFO] 操作完成。

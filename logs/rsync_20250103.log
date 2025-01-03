@@ -1,0 +1,246 @@
+[2025-01-03 12:38:34] [INFO] 开始向 spt 同步数据...
+[2025-01-03 12:38:34] [ERROR] 无法连接到服务器 spt 或该服务器未安装 rsync
+[2025-01-03 12:38:34] [INFO] 同步任务完成！
+[2025-01-03 12:38:44] [INFO] 开始向 spartan 同步数据...
+[2025-01-03 12:38:55] [INFO] 在服务器 spartan 上创建备份: nodeInfo_20250103_123855.tar.gz
+[2025-01-03 12:38:57] [ERROR] 在服务器 spartan 上创建备份失败
+[2025-01-03 12:38:57] [INFO] 同步任务完成！
+[2025-01-03 12:44:43] [INFO] 开始向 spartan 同步数据...
+[2025-01-03 12:44:46] [INFO] 在服务器 spartan 上创建备份: nodeInfo_20250103_124446.tar.gz
+[2025-01-03 12:44:48] [INFO] 检查需要更新的文件...
+sending incremental file list
+.d..t...... ./
+cd+++++++++ reality_ceci_alp/
+<f+++++++++ reality_ceci_alp/config.json
+<f+++++++++ reality_ceci_alp/nodeInfo-alp.json
+<f+++++++++ reality_ceci_alp/private.key
+<f+++++++++ reality_ceci_alp/public.key
+<f+++++++++ reality_ceci_alp/users.json
+cd+++++++++ reality_ceci_alp/log/
+cd+++++++++ reality_cpp_alp/
+<f+++++++++ reality_cpp_alp/config.json
+<f+++++++++ reality_cpp_alp/nodeInfo-alp.json
+<f+++++++++ reality_cpp_alp/private.key
+<f+++++++++ reality_cpp_alp/public.key
+<f+++++++++ reality_cpp_alp/users.json
+cd+++++++++ reality_cpp_alp/log/
+cd+++++++++ reality_frank_alp/
+<f+++++++++ reality_frank_alp/config.json
+<f+++++++++ reality_frank_alp/nodeInfo-alp.json
+<f+++++++++ reality_frank_alp/private.key
+<f+++++++++ reality_frank_alp/public.key
+<f+++++++++ reality_frank_alp/users.json
+cd+++++++++ reality_frank_alp/log/
+cd+++++++++ reality_han_alp/
+<f+++++++++ reality_han_alp/config.json
+<f+++++++++ reality_han_alp/nodeInfo-alp.json
+<f+++++++++ reality_han_alp/private.key
+<f+++++++++ reality_han_alp/public.key
+<f+++++++++ reality_han_alp/users.json
+cd+++++++++ reality_han_alp/log/
+cd+++++++++ reality_iceberg_alp/
+<f+++++++++ reality_iceberg_alp/config.json
+<f+++++++++ reality_iceberg_alp/nodeInfo-alp.json
+<f+++++++++ reality_iceberg_alp/private.key
+<f+++++++++ reality_iceberg_alp/public.key
+<f+++++++++ reality_iceberg_alp/users.json
+cd+++++++++ reality_iceberg_alp/log/
+cd+++++++++ reality_jack_alp/
+<f+++++++++ reality_jack_alp/config.json
+<f+++++++++ reality_jack_alp/nodeInfo-alp.json
+<f+++++++++ reality_jack_alp/private.key
+<f+++++++++ reality_jack_alp/public.key
+<f+++++++++ reality_jack_alp/users.json
+cd+++++++++ reality_jack_alp/log/
+cd+++++++++ reality_kyler_alp/
+<f+++++++++ reality_kyler_alp/config.json
+<f+++++++++ reality_kyler_alp/nodeInfo-alp.json
+<f+++++++++ reality_kyler_alp/private.key
+<f+++++++++ reality_kyler_alp/public.key
+<f+++++++++ reality_kyler_alp/users.json
+cd+++++++++ reality_kyler_alp/log/
+cd+++++++++ reality_qin_alp/
+<f+++++++++ reality_qin_alp/config.json
+<f+++++++++ reality_qin_alp/nodeInfo-alp.json
+<f+++++++++ reality_qin_alp/private.key
+<f+++++++++ reality_qin_alp/public.key
+<f+++++++++ reality_qin_alp/users.json
+cd+++++++++ reality_qin_alp/log/
+cd+++++++++ reality_reap_alp/
+<f+++++++++ reality_reap_alp/config.json
+<f+++++++++ reality_reap_alp/nodeInfo-alp.json
+<f+++++++++ reality_reap_alp/private.key
+<f+++++++++ reality_reap_alp/public.key
+<f+++++++++ reality_reap_alp/users.json
+cd+++++++++ reality_reap_alp/log/
+cd+++++++++ reality_rsp_alp/
+<f+++++++++ reality_rsp_alp/config.json
+<f+++++++++ reality_rsp_alp/nodeInfo-alp.json
+<f+++++++++ reality_rsp_alp/private.key
+<f+++++++++ reality_rsp_alp/public.key
+<f+++++++++ reality_rsp_alp/users.json
+cd+++++++++ reality_rsp_alp/log/
+cd+++++++++ reality_starry_alp/
+<f+++++++++ reality_starry_alp/config.json
+<f+++++++++ reality_starry_alp/nodeInfo-alp.json
+<f+++++++++ reality_starry_alp/private.key
+<f+++++++++ reality_starry_alp/public.key
+<f+++++++++ reality_starry_alp/users.json
+cd+++++++++ reality_starry_alp/log/
+cd+++++++++ reality_szm_alp/
+<f+++++++++ reality_szm_alp/config.json
+<f+++++++++ reality_szm_alp/nodeInfo-alp.json
+<f+++++++++ reality_szm_alp/private.key
+<f+++++++++ reality_szm_alp/public.key
+<f+++++++++ reality_szm_alp/users.json
+cd+++++++++ reality_szm_alp/log/
+cd+++++++++ reality_ybh_alp/
+<f+++++++++ reality_ybh_alp/config.json
+<f+++++++++ reality_ybh_alp/nodeInfo-alp.json
+<f+++++++++ reality_ybh_alp/private.key
+<f+++++++++ reality_ybh_alp/public.key
+<f+++++++++ reality_ybh_alp/users.json
+cd+++++++++ reality_ybh_alp/log/
+cd+++++++++ reality_yhbb_alp/
+<f+++++++++ reality_yhbb_alp/config.json
+<f+++++++++ reality_yhbb_alp/nodeInfo-alp.json
+<f+++++++++ reality_yhbb_alp/private.key
+<f+++++++++ reality_yhbb_alp/public.key
+<f+++++++++ reality_yhbb_alp/users.json
+cd+++++++++ reality_yhbb_alp/log/
+cd+++++++++ reality_yhdd_alp/
+<f+++++++++ reality_yhdd_alp/config.json
+<f+++++++++ reality_yhdd_alp/nodeInfo-alp.json
+<f+++++++++ reality_yhdd_alp/private.key
+<f+++++++++ reality_yhdd_alp/public.key
+<f+++++++++ reality_yhdd_alp/users.json
+cd+++++++++ reality_yhdd_alp/log/
+cd+++++++++ reality_yinlu_alp/
+<f+++++++++ reality_yinlu_alp/config.json
+<f+++++++++ reality_yinlu_alp/nodeInfo-alp.json
+<f+++++++++ reality_yinlu_alp/private.key
+<f+++++++++ reality_yinlu_alp/public.key
+<f+++++++++ reality_yinlu_alp/users.json
+cd+++++++++ reality_yinlu_alp/log/
+sent 3,728 bytes  received 387 bytes  1,646.00 bytes/sec
+total size is 47,280  speedup is 11.49 (DRY RUN)
+sending incremental file list
+./
+reality_ceci_alp/
+reality_ceci_alp/config.json
+reality_ceci_alp/nodeInfo-alp.json
+reality_ceci_alp/private.key
+reality_ceci_alp/public.key
+reality_ceci_alp/users.json
+reality_ceci_alp/log/
+reality_cpp_alp/
+reality_cpp_alp/config.json
+reality_cpp_alp/nodeInfo-alp.json
+reality_cpp_alp/private.key
+reality_cpp_alp/public.key
+reality_cpp_alp/users.json
+reality_cpp_alp/log/
+reality_frank_alp/
+reality_frank_alp/config.json
+reality_frank_alp/nodeInfo-alp.json
+reality_frank_alp/private.key
+reality_frank_alp/public.key
+reality_frank_alp/users.json
+reality_frank_alp/log/
+reality_han_alp/
+reality_han_alp/config.json
+reality_han_alp/nodeInfo-alp.json
+reality_han_alp/private.key
+reality_han_alp/public.key
+reality_han_alp/users.json
+reality_han_alp/log/
+reality_iceberg_alp/
+reality_iceberg_alp/config.json
+reality_iceberg_alp/nodeInfo-alp.json
+reality_iceberg_alp/private.key
+reality_iceberg_alp/public.key
+reality_iceberg_alp/users.json
+reality_iceberg_alp/log/
+reality_jack_alp/
+reality_jack_alp/config.json
+reality_jack_alp/nodeInfo-alp.json
+reality_jack_alp/private.key
+reality_jack_alp/public.key
+reality_jack_alp/users.json
+reality_jack_alp/log/
+reality_kyler_alp/
+reality_kyler_alp/config.json
+reality_kyler_alp/nodeInfo-alp.json
+reality_kyler_alp/private.key
+reality_kyler_alp/public.key
+reality_kyler_alp/users.json
+reality_kyler_alp/log/
+reality_qin_alp/
+reality_qin_alp/config.json
+reality_qin_alp/nodeInfo-alp.json
+reality_qin_alp/private.key
+reality_qin_alp/public.key
+reality_qin_alp/users.json
+reality_qin_alp/log/
+reality_reap_alp/
+reality_reap_alp/config.json
+reality_reap_alp/nodeInfo-alp.json
+reality_reap_alp/private.key
+reality_reap_alp/public.key
+reality_reap_alp/users.json
+reality_reap_alp/log/
+reality_rsp_alp/
+reality_rsp_alp/config.json
+reality_rsp_alp/nodeInfo-alp.json
+reality_rsp_alp/private.key
+reality_rsp_alp/public.key
+reality_rsp_alp/users.json
+reality_rsp_alp/log/
+reality_starry_alp/
+reality_starry_alp/config.json
+reality_starry_alp/nodeInfo-alp.json
+reality_starry_alp/private.key
+reality_starry_alp/public.key
+reality_starry_alp/users.json
+reality_starry_alp/log/
+reality_szm_alp/
+reality_szm_alp/config.json
+reality_szm_alp/nodeInfo-alp.json
+reality_szm_alp/private.key
+reality_szm_alp/public.key
+reality_szm_alp/users.json
+reality_szm_alp/log/
+reality_ybh_alp/
+reality_ybh_alp/config.json
+reality_ybh_alp/nodeInfo-alp.json
+reality_ybh_alp/private.key
+reality_ybh_alp/public.key
+reality_ybh_alp/users.json
+reality_ybh_alp/log/
+reality_yhbb_alp/
+reality_yhbb_alp/config.json
+reality_yhbb_alp/nodeInfo-alp.json
+reality_yhbb_alp/private.key
+reality_yhbb_alp/public.key
+reality_yhbb_alp/users.json
+reality_yhbb_alp/log/
+reality_yhdd_alp/
+reality_yhdd_alp/config.json
+reality_yhdd_alp/nodeInfo-alp.json
+reality_yhdd_alp/private.key
+reality_yhdd_alp/public.key
+reality_yhdd_alp/users.json
+reality_yhdd_alp/log/
+reality_yinlu_alp/
+reality_yinlu_alp/config.json
+reality_yinlu_alp/nodeInfo-alp.json
+reality_yinlu_alp/private.key
+reality_yinlu_alp/public.key
+reality_yinlu_alp/users.json
+reality_yinlu_alp/log/
+
+sent 13,024 bytes  received 1,671 bytes  5,878.00 bytes/sec
+total size is 47,280  speedup is 3.22
+[2025-01-03 12:44:53] [INFO] 成功同步到 spartan
+[2025-01-03 12:44:53] [INFO] 清理超过30天的旧备份...
+[2025-01-03 12:44:55] [INFO] 同步任务完成！

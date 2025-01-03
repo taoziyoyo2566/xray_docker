@@ -1,151 +1,0 @@
-[2024-12-04 10:58:46] [INFO] 开始从 rnc 同步数据到 /opt/docker/reality/nodeInfo/ ...
-[2024-12-04 10:59:06] [INFO] 同步 rnc 的目录 reality_taoziyoyo...
-[2024-12-04 10:59:09] [INFO] 成功从 rnc 的 reality_taoziyoyo 同步数据。
-[2024-12-04 10:59:09] [INFO] rsync 输出:
-receiving incremental file list
-./
-reality_taoziyoyo/
-reality_taoziyoyo/config.json
-              0   0%    0.00kB/s    0:00:00            2,113 100%    2.02MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_taoziyoyo/users.json
-              0   0%    0.00kB/s    0:00:00              204 100%  199.22kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 146 bytes  received 922 bytes  305.14 bytes/sec
-total size is 2,842  speedup is 2.66
-[2024-12-04 10:59:09] [INFO] 同步 rnc 的目录 reality_yinlu...
-[2024-12-04 10:59:12] [INFO] 成功从 rnc 的 reality_yinlu 同步数据。
-[2024-12-04 10:59:12] [INFO] rsync 输出:
-receiving incremental file list
-reality_yinlu/
-reality_yinlu/config.json
-              0   0%    0.00kB/s    0:00:00            2,109 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_yinlu/users.json
-              0   0%    0.00kB/s    0:00:00              200 100%  195.31kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 135 bytes  received 921 bytes  301.71 bytes/sec
-total size is 2,826  speedup is 2.68
-[2024-12-04 10:59:12] [INFO] 同步 rnc 的目录 reality_shm...
-[2024-12-04 10:59:15] [INFO] 成功从 rnc 的 reality_shm 同步数据。
-[2024-12-04 10:59:15] [INFO] rsync 输出:
-receiving incremental file list
-reality_shm/
-reality_shm/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_shm/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 133 bytes  received 911 bytes  298.29 bytes/sec
-total size is 2,818  speedup is 2.70
-[2024-12-04 10:59:15] [INFO] 同步 rnc 的目录 reality_frank...
-[2024-12-04 10:59:17] [INFO] 成功从 rnc 的 reality_frank 同步数据。
-[2024-12-04 10:59:17] [INFO] rsync 输出:
-receiving incremental file list
-reality_frank/
-reality_frank/config.json
-              0   0%    0.00kB/s    0:00:00            2,109 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_frank/users.json
-              0   0%    0.00kB/s    0:00:00              200 100%  195.31kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 135 bytes  received 913 bytes  419.20 bytes/sec
-total size is 2,826  speedup is 2.70
-[2024-12-04 10:59:17] [INFO] 同步 rnc 的目录 reality_cpp...
-[2024-12-04 10:59:19] [INFO] 成功从 rnc 的 reality_cpp 同步数据。
-[2024-12-04 10:59:19] [INFO] rsync 输出:
-receiving incremental file list
-reality_cpp/
-reality_cpp/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_cpp/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 133 bytes  received 914 bytes  418.80 bytes/sec
-total size is 2,818  speedup is 2.69
-[2024-12-04 10:59:19] [INFO] 同步 rnc 的目录 reality_szm...
-[2024-12-04 10:59:21] [INFO] 成功从 rnc 的 reality_szm 同步数据。
-[2024-12-04 10:59:21] [INFO] rsync 输出:
-receiving incremental file list
-reality_szm/
-reality_szm/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_szm/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 133 bytes  received 916 bytes  419.60 bytes/sec
-total size is 2,818  speedup is 2.69
-[2024-12-04 10:59:21] [INFO] rnc rsync 完成。
-[2024-12-04 10:59:21] [INFO] 开始从 alpha 同步数据到 /opt/docker/reality/nodeInfo/ ...
-[2024-12-04 10:59:33] [INFO] 同步 alpha 的目录 reality_cpp...
-[2024-12-04 10:59:35] [INFO] 成功从 alpha 的 reality_cpp 同步数据。
-[2024-12-04 10:59:35] [INFO] rsync 输出:
-receiving incremental file list
-./
-reality_cpp/
-reality_cpp/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_cpp/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 140 bytes  received 931 bytes  428.40 bytes/sec
-total size is 2,818  speedup is 2.63
-[2024-12-04 10:59:35] [INFO] 同步 alpha 的目录 reality_taoziyoyo...
-[2024-12-04 10:59:38] [INFO] 成功从 alpha 的 reality_taoziyoyo 同步数据。
-[2024-12-04 10:59:38] [INFO] rsync 输出:
-receiving incremental file list
-reality_taoziyoyo/
-reality_taoziyoyo/config.json
-              0   0%    0.00kB/s    0:00:00            2,113 100%    2.02MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_taoziyoyo/users.json
-              0   0%    0.00kB/s    0:00:00              204 100%  199.22kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 139 bytes  received 923 bytes  303.43 bytes/sec
-total size is 2,842  speedup is 2.68
-[2024-12-04 10:59:38] [INFO] 同步 alpha 的目录 reality_shm...
-[2024-12-04 10:59:40] [INFO] 成功从 alpha 的 reality_shm 同步数据。
-[2024-12-04 10:59:40] [INFO] rsync 输出:
-receiving incremental file list
-reality_shm/
-reality_shm/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_shm/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 133 bytes  received 923 bytes  422.40 bytes/sec
-total size is 2,818  speedup is 2.67
-[2024-12-04 10:59:40] [INFO] 同步 alpha 的目录 reality_yinlu...
-[2024-12-04 10:59:43] [INFO] 成功从 alpha 的 reality_yinlu 同步数据。
-[2024-12-04 10:59:43] [INFO] rsync 输出:
-receiving incremental file list
-reality_yinlu/
-reality_yinlu/config.json
-              0   0%    0.00kB/s    0:00:00            2,109 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_yinlu/users.json
-              0   0%    0.00kB/s    0:00:00              200 100%  195.31kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 135 bytes  received 930 bytes  304.29 bytes/sec
-total size is 2,826  speedup is 2.65
-[2024-12-04 10:59:43] [INFO] 同步 alpha 的目录 reality_frank...
-[2024-12-04 10:59:45] [INFO] 成功从 alpha 的 reality_frank 同步数据。
-[2024-12-04 10:59:45] [INFO] rsync 输出:
-receiving incremental file list
-reality_frank/
-reality_frank/config.json
-              0   0%    0.00kB/s    0:00:00            2,109 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_frank/users.json
-              0   0%    0.00kB/s    0:00:00              200 100%  195.31kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 135 bytes  received 923 bytes  423.20 bytes/sec
-total size is 2,826  speedup is 2.67
-[2024-12-04 10:59:45] [INFO] 同步 alpha 的目录 reality_szm...
-[2024-12-04 10:59:48] [INFO] 成功从 alpha 的 reality_szm 同步数据。
-[2024-12-04 10:59:48] [INFO] rsync 输出:
-receiving incremental file list
-reality_szm/
-reality_szm/config.json
-              0   0%    0.00kB/s    0:00:00            2,107 100%    2.01MB/s    0:00:00 (xfr#1, to-chk=2/5)
-reality_szm/users.json
-              0   0%    0.00kB/s    0:00:00              198 100%  193.36kB/s    0:00:00 (xfr#2, to-chk=0/5)
-
-sent 133 bytes  received 925 bytes  302.29 bytes/sec
-total size is 2,818  speedup is 2.66
-[2024-12-04 10:59:48] [INFO] alpha rsync 完成。
-[2024-12-04 10:59:48] [INFO] 所有服务器同步任务完成！

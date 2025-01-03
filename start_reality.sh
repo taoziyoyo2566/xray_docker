@@ -3,6 +3,13 @@ set -o pipefail
 
 # 定义固定的日志文件名
 LOGFILE="start_reality.log"
+# 定义日志相关路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LOG_DIR="${SCRIPT_DIR}/logs"
+LOGFILE="${LOG_DIR}/start_reality_$(date '+%Y%m%d').log"
+
+# 确保日志目录存在
+mkdir -p "$LOG_DIR"
 
 # 日志函数，将输出重定向到日志文件和标准错误，并添加时间戳
 log_info() {
@@ -332,7 +339,7 @@ process_config_file() {
     CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
     # 创建用户配置文件目录
-    CONFIG_DIR="/opt/docker/reality/nodeInfo/reality_${u}"
+    CONFIG_DIR="/opt/docker/reality/nodeInfo/reality_${u}_${s}"
     mkdir -p "${CONFIG_DIR}/log"
 
     #-------------------------------------------
