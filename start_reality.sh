@@ -265,7 +265,8 @@ process_config_file() {
     REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
     local DOMAIN_NAME
     DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "s"
-
+    USERS="${USERS}.${DOMAIN_NAME}@taoziyoyo.com"
+    
     # 获取 "u" 字段的值，用于目录名
     local u
     u=$(jq -r '.u' "$CONFIG_FILE")
