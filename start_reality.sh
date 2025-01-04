@@ -64,6 +64,11 @@ is_port_in_use() {
     fi
 }
 
+install_xxd(){
+    if ! command -v xxd >/dev/null 2>&1; then
+      sudo cp ./xxd /usr/bin/
+    fi
+}
 # 检查并安装必要的软件
 check_and_install() {
     local cmd=$1
@@ -631,6 +636,7 @@ main() {
     check_and_install netstat net-tools
     check_and_install curl curl
     check_and_install rsync rsync
+    install_xxd
 
     # 初始化变量，设置默认值
     USERS=""
