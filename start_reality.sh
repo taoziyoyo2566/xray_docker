@@ -364,6 +364,15 @@ process_config_file() {
         fi
     fi
 
+    # 处理过期日期
+    if [ -n "$EXPIRE_DATE" ]; then
+        if ! date -d "${EXPIRE_DATE}" +"%Y%m%d" &>/dev/null; then
+            log_error "无效的日期格式，请使用 YYYYMMDD 格式，例如 20231231"
+            exit 1
+        fi
+        EXPIRE_DATE_ISO=$(date -d "${EXPIRE_DATE}" -u +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+
     if [ "$REUSE_EXISTING" = "false" ]; then
         #-------------------------------------------
         # 重新生成配置
@@ -378,14 +387,6 @@ process_config_file() {
             if [ -z "$uuid" ]; then
                 log_error "生成 UUID 失败。"
                 exit 1
-            fi
-            # 处理过期日期
-            if [ -n "$EXPIRE_DATE" ]; then
-                if ! date -d "${EXPIRE_DATE}" +"%Y%m%d" &>/dev/null; then
-                    log_error "无效的日期格式，请使用 YYYYMMDD 格式，例如 20231231"
-                    exit 1
-                fi
-                EXPIRE_DATE_ISO=$(date -d "${EXPIRE_DATE}" -u +"%Y-%m-%dT%H:%M:%SZ")
             fi
 
             # 构建用户 JSON
@@ -546,11 +547,7 @@ process_config_file() {
         COUNTRY=$(get_country)
         local CREATE_TIME
         CREATE_TIME=$(date +"%Y-%m-%dT%H:%M:%S")
-        local EXPIRE_DATE_FORMATTED
-        EXPIRE_DATE_FORMATTED=""
-        if [ -n "$EXPIRE_DATE_ISO" ]; then
-            EXPIRE_DATE_FORMATTED=$(date -d "${EXPIRE_DATE_ISO}" -u +"%Y-%m-%dT%H:%M:%SZ")
-        fi
+        local EXPIRE_DATE_FORMATTED="$EXPIRE_DATE_ISO"
 
         local node_info_json
         node_info_json=$(jq -n \
