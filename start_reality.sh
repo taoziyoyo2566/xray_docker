@@ -404,7 +404,6 @@ process_config_file() {
     local CLIENTS_JSON USER_UUID_LIST USER_INFO_LIST NODE_INFO_LIST
     local CONTAINER_NAME CONFIG_DIR
     local PRIVATEKEY PUBLICKEY
-    local REGION_VAR DOMAIN_SUFFIX
     local FLOW NETWORK DEST SERVERNAMES SNI FINGERPRINT SHORTID
     # CPU、内存限制在 main() 中全局设置，这里可直接引用
     local CPU_LIMIT="$CPU_LIMIT"
@@ -415,7 +414,6 @@ process_config_file() {
     PORT=$(jq -r '.p' "$CONFIG_FILE")
     URL_ID=$(jq -r '.i' "$CONFIG_FILE")
     EXPIRE_DATE=$(jq -r '.e' "$CONFIG_FILE")
-    REGION_VAR=$(jq -r '.r' "$CONFIG_FILE")
     local DOMAIN_NAME
     DOMAIN_NAME=$(jq -r '.s' "$CONFIG_FILE")  # 从 JSON 文件中读取 "s"
     USERS="${USERS}.${DOMAIN_NAME}@taoziyoyo.com"
@@ -474,15 +472,8 @@ process_config_file() {
         URL_ID=$(generate_url_id)
     fi
 
-    # 验证 REGION
-    local REGION="${REGION_VAR:-TESTUS}"
-    if ! echo "$REGION" | grep -qE '^[A-Z]{6}$'; then
-        log_error "参数 REGION 必须是6位大写英文字母。"
-        exit 1
-    fi
-
     # 设置 CONTAINER_NAME
-    CONTAINER_NAME="reality_${REGION}_${URL_ID}"
+    CONTAINER_NAME="reality_${u}_${URL_ID}"
 
     # 设置数据目录
     local BASE_DIR="/opt/docker/reality/nodeInfo"
@@ -689,8 +680,7 @@ process_config_file() {
       --memory="$MEMORY_LIMIT" \
       $port_mappings \
       -e EXTERNAL_PORT="$PORT" \
-      --env REGION="$REGION" \
-      --env URL_ID="$URL_ID" \
+      -e URL_ID="$URL_ID" \
       -v "${CONFIG_DIR}/config.json:/config.json:ro" \
       -v "${CONFIG_DIR}/users.json:/users.json:ro" \
       -v "${CONFIG_DIR}/log:/var/log/xray" \

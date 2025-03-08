@@ -58,9 +58,17 @@ done
 
 #USER_ID=alp
 # 执行命令
-for d in client_${USER_ID}_{me,sub,chatgpt}_202412041334; do
+<!-- for d in client_${USER_ID}_{me,sub,chatgpt}_202412041334; do
     bash start_reality.sh -d "$d"
+done -->
+#20250308
+TARGET=dcc
+for i in {me,sub,chatgpt};do
+    bash user_config.sh -s spt -d $i -to $TARGET
 done
 
 # rsync from server[dcc,zgo]
 bash rsync.sh -s dc,zgo
+
+# remote specified element
+for file in client_dcc_me_202412041334/*.json; do jq 'del(.r)' "$file" > "$file.tmp" && mv "$file.tmp" "$file"; done
