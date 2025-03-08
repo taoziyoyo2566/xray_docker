@@ -52,23 +52,35 @@ sudo cp xxd /usr/bin/
 # permission
 sudo chown -R ${USER}:${USER} /opt/docker/reality/
 
-for d in client_spt_{me,sub,chatgpt}_202412041334; do
-    bash user_config.sh --transfer -s alp -d "$d"
-done
+# remote specified element
+for file in client_spt_{me,sub,chatgpt}_202412041334/*.json; do jq 'del(.r)' "$file" > "$file.tmp" && mv "$file.tmp" "$file"; done
 
-#USER_ID=alp
 # 执行命令
-<!-- for d in client_${USER_ID}_{me,sub,chatgpt}_202412041334; do
-    bash start_reality.sh -d "$d"
-done -->
 #20250308
-TARGET=dcc
-for i in {me,sub,chatgpt};do
-    bash user_config.sh -s spt -d $i -to $TARGET
+#TARGET=dcc
+# Check if TARGET is exactly 3 English letters
+if [[ ! $TARGET =~ ^[a-zA-Z]{3}$ ]]; then
+  echo "Error: TARGET must be exactly 3 English letters"
+  exit 1
+fi
+for i in {me,sub,chatgpt}; do
+  bash user_config.sh -s spt -d $i -to $TARGET
 done
 
 # rsync from server[dcc,zgo]
 bash rsync.sh -s dc,zgo
 
-# remote specified element
-for file in client_dcc_me_202412041334/*.json; do jq 'del(.r)' "$file" > "$file.tmp" && mv "$file.tmp" "$file"; done
+#20250308
+# run
+server=dcc
+patterns="me sub chatgpt"
+
+for pattern in $patterns; do
+  latest_dir=$(find . -maxdepth 1 -type d -name "client_${server}_${pattern}_*" | sort -r | head -n 1)
+  if [ -n "$latest_dir" ]; then
+    echo "Processing directory: $latest_dir"
+    bash start_reality.sh -d "$latest_dir"
+  else
+    echo "No directory found matching pattern: client_${server}_${pattern}_*"
+  fi
+done
