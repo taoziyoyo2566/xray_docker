@@ -51,8 +51,8 @@ delete latest 5 docker instances
 docker rm -f $(docker ps -a --filter "name=^reality_" -q)
 docker ps -a --format "{{.CreatedAt}}\t{{.ID}}" | sort -r | head -n 7 | cut -f2 | xargs docker rm
 
----rsync
-#bash rsync.sh -s rnc,alpha
+# get ipv6 address local
+ip -6 addr show scope global | grep -v temporary | grep -oP '(?<=inet6\s)[0-9a-f:]+(?=\/)'
 
 sudo cp xxd /usr/bin/
 # permission
@@ -68,5 +68,5 @@ for d in client_${USER_ID}_{me,sub,chatgpt}_202412041334; do
     bash start_reality.sh -d "$d"
 done
 
-# send to spt vps
-bash rsync.sh -s spt
+# rsync from server[dcc,zgo]
+bash rsync.sh -s dc,zgo
