@@ -3,6 +3,7 @@ set -o pipefail
 
 # 定义固定的日志文件名
 LOGFILE="start_reality.log"
+
 # 定义日志相关路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
@@ -20,22 +21,50 @@ log_error() {
     echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" | tee -a "$LOGFILE" >&2
 }
 
+# 设置数据目录的函数，确保目录存在且当前用户有权限
+setup_data_directory() {
+    # 获取当前用户
+    local current_user=$(whoami)
+    
+    # 定义基础数据目录
+    local reality_dir="/opt/docker/reality/nodeInfo"
+    
+    # 创建目录结构
+    sudo mkdir -p "${reality_dir}"
+    
+    # 确保权限正确
+    sudo chown -R $current_user:$current_user "${reality_dir}"
+    log_info "数据目录已设置在: ${reality_dir}"
+    
+    # 返回创建的目录路径
+    echo "${reality_dir}"
+}
+
 # 显示帮助信息的函数，使用 log_info 输出
 show_help() {
     log_info "Usage: $0 [options]"
     log_info ""
     log_info "Options:"
-    log_info "  -u USERS         设置用户列表（用逗号分隔）"
-    log_info "  -p PORT          设置端口号（5位，>20000）"
-    log_info "  -i URL_ID        指定 URL ID（8位大写字母和数字）"
-    log_info "  -r REGION        设置区域标识（6位大写字母）"
-    log_info "  -d DIRECTORY     指定包含 JSON 配置文件的目录"
-    log_info "  -m MONTHS        设置有效月数（暂未使用，可自行扩展）"
-    log_info "  -c CPU_LIMIT     设置 CPU 限制（例如，0.5）"
-    log_info "  -M MEMORY_LIMIT  设置内存限制（例如，300m）"
-    log_info "  -e EXPIRE_DATE   设置过期日期（格式 YYYYMMDD）"
     log_info "  -f CONFIG_FILE   指定 JSON 配置文件"
+    log_info "  -d DIRECTORY     指定包含 JSON 配置文件的目录"
     log_info "  -h               显示帮助信息"
+}
+
+# 检查容器是否已经存在并且正在运行
+check_container_running() {
+    local container_name="$1"
+    
+    # 检查容器是否存在
+    if ! docker ps -a --format '{{.Names}}' | grep -q "^${container_name}$"; then
+        return 1
+    fi
+    
+    # 检查容器是否正在运行
+    if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+        return 1
+    fi
+    
+    return 0
 }
 
 # 生成包含大写字母和数字的随机 URL_ID
@@ -94,28 +123,68 @@ generate_x25519_keys() {
     local CONFIG_DIR="$1"
     local CONTAINER_NAME="xray-x25519"
 
-    # 检查容器是否已经运行
-    if docker ps --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    # 检查容器是否已经存在且正在运行
+    if check_container_running "${CONTAINER_NAME}"; then
         log_info "密钥生成容器 '${CONTAINER_NAME}' 已经在运行。"
     else
-        log_info "密钥生成容器 '${CONTAINER_NAME}' 不存在，正在创建..."
+        # 如果容器存在但不在运行，先删除它
+        if docker ps -a --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            log_info "密钥生成容器 '${CONTAINER_NAME}' 存在但未运行，正在移除..."
+            docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1
+        fi
+        
+        log_info "正在创建密钥生成容器..."
         docker run -d --name "${CONTAINER_NAME}" --rm \
             --memory="180m" --memory-swap="200m" --cpus="0.5" \
             teddysun/xray tail -f /dev/null
+        
         if [ $? -ne 0 ]; then
             log_error "无法创建密钥生成容器 '${CONTAINER_NAME}'。"
             exit 1
         fi
-        log_info "密钥生成容器 '${CONTAINER_NAME}' 已创建。"
-        # 等待容器启动
-        sleep 5
+        
+        log_info "密钥生成容器 '${CONTAINER_NAME}' 已创建，等待容器完全启动..."
+        
+        # 等待容器完全启动，最多等待30秒
+        local wait_count=0
+        while ! docker exec "${CONTAINER_NAME}" echo "Container is ready" >/dev/null 2>&1; do
+            sleep 1
+            wait_count=$((wait_count + 1))
+            if [ $wait_count -ge 30 ]; then
+                log_error "等待容器启动超时，请检查Docker状态。"
+                exit 1
+            fi
+        done
+        
+        log_info "密钥生成容器已准备就绪。"
+    fi
+
+    # 确保容器运行状态，再次检查
+    if ! check_container_running "${CONTAINER_NAME}"; then
+        log_error "密钥生成容器不在运行状态，无法生成密钥。"
+        exit 1
     fi
 
     # 调用 Xray 容器生成 X25519 密钥对
     local output
-    output=$(docker exec "${CONTAINER_NAME}" xray x25519 | grep -E "Private key:|Public key:")
-    if [ $? -ne 0 ]; then
-        log_error "无法在容器内生成密钥。"
+    local retry_count=0
+    local max_retries=3
+    
+    while [ $retry_count -lt $max_retries ]; do
+        output=$(docker exec "${CONTAINER_NAME}" xray x25519 2>&1)
+        
+        # 检查命令是否成功执行
+        if [ $? -eq 0 ] && echo "$output" | grep -q "Private key:"; then
+            break
+        fi
+        
+        log_info "生成密钥重试 ($((retry_count+1))/$max_retries)..."
+        retry_count=$((retry_count + 1))
+        sleep 2
+    done
+    
+    if [ $retry_count -eq $max_retries ]; then
+        log_error "多次尝试生成密钥失败。错误输出: $output"
         exit 1
     fi
 
@@ -126,7 +195,7 @@ generate_x25519_keys() {
     PUBLICKEY=$(echo "$output" | grep "Public key:" | awk -F': ' '{print $2}')
 
     if [ -z "$PRIVATEKEY" ] || [ -z "$PUBLICKEY" ]; then
-        log_error "生成密钥失败。"
+        log_error "生成密钥失败。输出内容: $output"
         exit 1
     fi
 
@@ -255,6 +324,77 @@ prompt_overwrite() {
     fi
 }
 
+# 检查IPv6连接
+check_ipv6() {
+    if ping6 -c 1 -W 2 ipv6.google.com >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# 获取IPv6地址
+get_ipv6() {
+    local ipv6=$(curl -6 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
+    # 如果上面的方法失败，尝试其他方式获取IPv6地址
+    if [ -z "$ipv6" ]; then
+        ipv6=$(ip -6 addr show scope global | grep -v temporary | grep -oP '(?<=inet6\s)[0-9a-f:]+(?=\/)')
+    fi
+    
+    # 去除地址中可能的接口标识
+    ipv6=$(echo "$ipv6" | head -n 1 | sed 's/%.*//g')
+    echo "$ipv6"
+}
+
+ # 用于创建两种节点（IPv4和IPv6）
+create_node_info() {
+    local type=$1  # "ipv4"或"ipv6"
+    local domain=$2  # 使用的域名
+    
+    for user_info in "${USER_INFO_LIST[@]}"; do
+        local email
+        local uuid
+        email=$(echo "$user_info" | cut -d'|' -f1)
+        uuid=$(echo "$user_info" | cut -d'|' -f2)
+
+        local encoded_email
+        encoded_email=$(urlencode "$email")
+
+        local SUB_LINK
+        SUB_LINK="vless://${uuid}@${domain}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}_${type}"
+
+        local COUNTRY
+        COUNTRY=$(get_country)
+        local CREATE_TIME
+        CREATE_TIME=$(date +"%Y-%m-%dT%H:%M:%S")
+        local EXPIRE_DATE_FORMATTED="$EXPIRE_DATE_ISO"
+
+        local node_info_json
+        node_info_json=$(jq -n \
+            --arg user "$email" \
+            --arg id "$uuid" \
+            --arg expire "$EXPIRE_DATE_FORMATTED" \
+            --arg subscription "$SUB_LINK" \
+            --arg country "$COUNTRY" \
+            --arg server "$DOMAIN_NAME" \
+            --arg updateDate "$CREATE_TIME" \
+            --arg uid "$URL_ID" \
+            --arg type "$type" \
+            '{
+                user: $user,
+                id: $id,
+                expire: $expire,
+                subscription: $subscription,
+                country: $country,
+                server: $server,
+                updateDate: $updateDate,
+                uid: $uid,
+                type: $type
+            }')
+        NODE_INFO_LIST+=("$node_info_json")
+    done
+}
+
 # 处理单个配置文件的函数
 process_config_file() {
     local CONFIG_FILE="$1"
@@ -266,8 +406,8 @@ process_config_file() {
     local REGION_VAR DOMAIN_SUFFIX
     local FLOW NETWORK DEST SERVERNAMES SNI FINGERPRINT SHORTID
     # CPU、内存限制在 main() 中全局设置，这里可直接引用
-    # local CPU_LIMIT="$CPU_LIMIT"
-    # local MEMORY_LIMIT="$MEMORY_LIMIT"
+    local CPU_LIMIT="$CPU_LIMIT"
+    local MEMORY_LIMIT="$MEMORY_LIMIT"
 
     # 解析 JSON 文件
     USERS=$(jq -r '.u' "$CONFIG_FILE")
@@ -291,13 +431,13 @@ process_config_file() {
 
     # 验证 USERS
     if [ -z "$USERS" ]; then
-        log_error "必须指定用户列表，使用 -u 参数或在配置文件中指定。"
+        log_error "必须指定用户列表，在配置文件中指定。"
         exit 1
     fi
 
     # 验证域名
     if [ -z "$DOMAIN_NAME_FULL" ]; then
-        log_error "必须指定域名，使用 -s 参数或在配置文件中指定。"
+        log_error "必须指定域名，在配置文件中指定。"
         exit 1
     fi
 
@@ -343,9 +483,16 @@ process_config_file() {
     # 设置 CONTAINER_NAME
     CONTAINER_NAME="reality_${REGION}_${URL_ID}"
 
-    # 创建用户配置文件目录
-    CONFIG_DIR="/opt/docker/reality/nodeInfo/reality_${u}_${s}"
+    # 设置数据目录
+    local BASE_DIR="/opt/docker/reality/nodeInfo"
+    
+    local CONFIG_DIR="${BASE_DIR}/reality_${u}_${s}"
     mkdir -p "${CONFIG_DIR}/log"
+    
+    if [ $? -ne 0 ]; then
+        log_error "无法创建目录：${CONFIG_DIR}/log"
+        return 1
+    fi
 
     #-------------------------------------------
     # 检测目录下是否已有完整配置文件
@@ -370,12 +517,34 @@ process_config_file() {
     fi
 
     # 处理过期日期
+    # Improve date validation to check future dates
     if [ -n "$EXPIRE_DATE" ]; then
         if ! date -d "${EXPIRE_DATE}" +"%Y%m%d" &>/dev/null; then
             log_error "无效的日期格式，请使用 YYYYMMDD 格式，例如 20231231"
-            exit 1
+            return 1
         fi
+        
+        # Check if date is in the future
+        current_date=$(date +"%Y%m%d")
+        if [ "$EXPIRE_DATE" -lt "$current_date" ]; then
+            log_error "过期日期已经过去，请提供未来的日期"
+            return 1
+        fi        
         EXPIRE_DATE_ISO=$(date -d "${EXPIRE_DATE}" -u +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+
+    # 检查IPv6连接
+    local HAS_IPV6=false
+    local IPV6_ADDRESS=""
+    if check_ipv6; then
+        HAS_IPV6=true
+        IPV6_ADDRESS=$(get_ipv6)
+        if [ -n "$IPV6_ADDRESS" ]; then
+            log_info "检测到IPv6地址: $IPV6_ADDRESS"
+        else
+            log_info "系统支持IPv6但无法获取有效地址，将只使用IPv4"
+            HAS_IPV6=false
+        fi
     fi
 
     if [ "$REUSE_EXISTING" = "false" ]; then
@@ -491,17 +660,32 @@ process_config_file() {
         .inbounds[0].streamSettings.realitySettings.shortIds = [$shortId]' \
        "${CONFIG_DIR}/config.json" > "${CONFIG_DIR}/config_tmp.json" && mv "${CONFIG_DIR}/config_tmp.json" "${CONFIG_DIR}/config.json"
 
-    # ipv4
+    # 获取IPv4地址
     local ipv4
     ipv4=$(curl -4 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
+    
+    # 准备Docker运行的端口映射参数
+    local port_mappings="-p $ipv4:$PORT:443"
+    
+    # 如果有IPv6地址，添加IPv6端口映射
+    if [ "$HAS_IPV6" = true ] && [ -n "$IPV6_ADDRESS" ]; then
+        port_mappings="$port_mappings -p $IPV6_ADDRESS:$PORT:443"
+    fi
 
     log_info "正在启动 Docker 容器：$CONTAINER_NAME"
+    # 检查容器是否已存在，如果存在则先移除
+    if docker ps -a --filter "name=$CONTAINER_NAME" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        log_info "容器 $CONTAINER_NAME 已存在，正在移除..."
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1
+    fi
+    
+    # 启动Docker容器，使用准备好的端口映射参数
     docker run -d --name "$CONTAINER_NAME" \
       --restart=always \
       --log-opt max-size=50m \
       --cpus="$CPU_LIMIT" \
       --memory="$MEMORY_LIMIT" \
-      -p "$ipv4:$PORT:443" \
+      $port_mappings \
       -e EXTERNAL_PORT="$PORT" \
       --env REGION="$REGION" \
       --env URL_ID="$URL_ID" \
@@ -536,46 +720,14 @@ process_config_file() {
     # 生成 nodeInfo-<n>.json（始终重新生成）
     #-------------------------------------------
     NODE_INFO_LIST=()
-    for user_info in "${USER_INFO_LIST[@]}"; do
-        local email
-        local uuid
-        email=$(echo "$user_info" | cut -d'|' -f1)
-        uuid=$(echo "$user_info" | cut -d'|' -f2)
 
-        local encoded_email
-        encoded_email=$(urlencode "$email")
-
-        local SUB_LINK
-        SUB_LINK="vless://${uuid}@${DOMAIN_NAME_FULL}:${PORT}?encryption=none&security=reality&pbk=${PUBLICKEY}&sid=${SHORTID}&flow=${FLOW}&sni=${SNI}&fp=${FINGERPRINT}&type=${NETWORK}#${encoded_email}"
-
-        local COUNTRY
-        COUNTRY=$(get_country)
-        local CREATE_TIME
-        CREATE_TIME=$(date +"%Y-%m-%dT%H:%M:%S")
-        local EXPIRE_DATE_FORMATTED="$EXPIRE_DATE_ISO"
-
-        local node_info_json
-        node_info_json=$(jq -n \
-            --arg user "$email" \
-            --arg id "$uuid" \
-            --arg expire "$EXPIRE_DATE_FORMATTED" \
-            --arg subscription "$SUB_LINK" \
-            --arg country "$COUNTRY" \
-            --arg server "$DOMAIN_NAME" \
-            --arg updateDate "$CREATE_TIME" \
-            --arg uid "$URL_ID" \
-            '{
-                user: $user,
-                id: $id,
-                expire: $expire,
-                subscription: $subscription,
-                country: $country,
-                server: $server,
-                updateDate: $updateDate,
-                uid: $uid
-            }')
-        NODE_INFO_LIST+=("$node_info_json")
-    done
+    # 创建IPv4节点信息
+    create_node_info "ipv4" "${DOMAIN_NAME_FULL}"
+    
+    # 如果有IPv6，创建IPv6节点信息
+    if [ "$HAS_IPV6" = true ] && [ -n "$IPV6_ADDRESS" ]; then
+        create_node_info "ipv6" "${DOMAIN_NAME_FULL}"
+    fi
 
     local NODE_INFO_FILENAME="nodeInfo-${s}.json"
     local NODE_INFO_JSON
@@ -627,6 +779,7 @@ process_config_file() {
 }
 
 # 主函数
+# 主函数
 main() {
     # 检查并安装必要的软件
     check_and_install uuidgen uuid-runtime
@@ -638,29 +791,19 @@ main() {
     check_and_install rsync rsync
     install_xxd
 
+    setup_data_directory
+
     # 初始化变量，设置默认值
-    USERS=""
-    PORT=""
-    REGION=""
     CPU_LIMIT="0.5"     # 默认 CPU 限制
     MEMORY_LIMIT="300m" # 默认内存限制
-    EXPIRE_DATE=""      # 用户有效期
-    URL_ID=""           # URL ID
     CONFIG_FILE=""
     DIRECTORY=""
 
     # 使用 getopts 解析命令行参数
-    while getopts "u:i:p:r:d:m:c:M:e:f:h" opt; do
+    while getopts "f:d:h" opt; do
         case $opt in
-            u) USERS="$OPTARG";;
-            i) URL_ID="$OPTARG";;
-            p) PORT="$OPTARG";;
-            r) REGION="$OPTARG";;
-            d) DIRECTORY="$OPTARG";;
-            c) CPU_LIMIT="$OPTARG";;
-            M) MEMORY_LIMIT="$OPTARG";;
-            e) EXPIRE_DATE="$OPTARG";;
             f) CONFIG_FILE="$OPTARG";;
+            d) DIRECTORY="$OPTARG";;
             h)
                 show_help
                 exit 0;;
@@ -702,6 +845,53 @@ main() {
         fi
     fi
 
+    # 确保X25519密钥生成容器已经启动
+    log_info "预先启动X25519密钥生成容器..."
+    local CONTAINER_NAME="xray-x25519"
+    
+    # 如果容器已存在但未运行，先删除它
+    if docker ps -a --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$" && \
+       ! docker ps --filter "name=${CONTAINER_NAME}" --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        log_info "密钥生成容器 '${CONTAINER_NAME}' 存在但未运行，正在移除..."
+        docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1
+    fi
+    
+    # 如果容器不存在或不在运行，创建并启动它
+    if ! check_container_running "${CONTAINER_NAME}"; then
+        log_info "正在创建和启动密钥生成容器 '${CONTAINER_NAME}'..."
+        docker run -d --name "${CONTAINER_NAME}" --rm \
+            --memory="180m" --memory-swap="200m" --cpus="0.5" \
+            teddysun/xray tail -f /dev/null
+            
+        if [ $? -ne 0 ]; then
+            log_error "无法创建密钥生成容器 '${CONTAINER_NAME}'。"
+            exit 1
+        fi
+        
+        # 等待容器完全启动
+        log_info "等待密钥生成容器启动..."
+        local wait_count=0
+        while ! docker exec "${CONTAINER_NAME}" echo "Container is ready" >/dev/null 2>&1; do
+            sleep 1
+            wait_count=$((wait_count + 1))
+            if [ $wait_count -ge 30 ]; then
+                log_error "等待容器启动超时，请检查Docker状态。"
+                exit 1
+            fi
+        done
+        log_info "密钥生成容器已启动并准备就绪。"
+    else
+        log_info "密钥生成容器 '${CONTAINER_NAME}' 已在运行中。"
+    fi
+    
+    # 验证容器是否能正常生成密钥
+    log_info "测试容器是否能正常生成密钥..."
+    if ! docker exec "${CONTAINER_NAME}" xray x25519 >/dev/null 2>&1; then
+        log_error "密钥生成容器无法正常生成密钥，请检查容器状态。"
+        exit 1
+    fi
+    log_info "密钥生成容器工作正常。"
+    
     if [ -n "$DIRECTORY" ]; then
         # 检查目录是否存在
         if [ ! -d "$DIRECTORY" ]; then
@@ -713,15 +903,24 @@ main() {
             if [ -f "$CF" ]; then
                 log_info "正在处理配置文件: $CF"
                 process_config_file "$CF"
+                if [ $? -ne 0 ]; then
+                    log_error "处理配置文件 $CF 失败，继续处理下一个文件。"
+                    continue
+                fi
             fi
         done
-    else
-        if [ -n "$CONFIG_FILE" ]; then
-            process_config_file "$CONFIG_FILE"
-        else
-            log_error "必须指定配置文件 (-f) 或目录 (-d)。"
+    elif [ -n "$CONFIG_FILE" ]; then
+        # 检查配置文件是否存在
+        if [ ! -f "$CONFIG_FILE" ]; then
+            log_error "配置文件 $CONFIG_FILE 不存在。"
             exit 1
         fi
+        log_info "正在处理配置文件: $CONFIG_FILE"
+        process_config_file "$CONFIG_FILE"
+    else
+        log_error "必须指定配置文件 (-f) 或目录 (-d)。"
+        show_help
+        exit 1
     fi
 
     log_info "操作成功完成。"
