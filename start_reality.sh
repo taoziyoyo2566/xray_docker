@@ -334,15 +334,16 @@ check_ipv6() {
 }
 
 # 获取IPv6地址
+# Get IPv6 address (fixed version)
 get_ipv6() {
-    local ipv6=$(curl -6 -sSL --connect-timeout 3 --retry 2 ip.sb || echo "null")
-    # 如果上面的方法失败，尝试其他方式获取IPv6地址
+    local ipv6=$(curl -6 -sSL --connect-timeout 3 --retry 2 ip.sb 2>/dev/null || echo "")
+    # If above method fails, try alternative
     if [ -z "$ipv6" ]; then
         ipv6=$(ip -6 addr show scope global | grep -v temporary | grep -oP '(?<=inet6\s)[0-9a-f:]+(?=\/)')
     fi
     
-    # 去除地址中可能的接口标识
-    ipv6=$(echo "$ipv6" | head -n 1 | sed 's/%.*//g')
+    # Clean the address - remove interface identifier and any prefix text
+    ipv6=$(echo "$ipv6" | head -n 1 | sed 's/%.*//g' | sed 's/^ipv6:\s*//')
     echo "$ipv6"
 }
 
@@ -669,7 +670,8 @@ process_config_file() {
     
     # 如果有IPv6地址，添加IPv6端口映射
     if [ "$HAS_IPV6" = true ] && [ -n "$IPV6_ADDRESS" ]; then
-        port_mappings="$port_mappings -p $IPV6_ADDRESS:$PORT:443"
+        log_info "Using IPv6 address for port mapping: $IPV6_ADDRESS"
+        port_mappings="$port_mappings -p [$IPV6_ADDRESS]:$PORT:443"  # Note the square brackets
     fi
 
     log_info "正在启动 Docker 容器：$CONTAINER_NAME"
@@ -928,3 +930,4 @@ main() {
 
 # 执行主函数
 main "$@"
+
