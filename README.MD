@@ -70,6 +70,8 @@ done
 # rsync from server[dcc,zgo]
 bash rsync.sh -s dc,zgo
 
+rm -rf /opt/docker/reality/nodeInfo/reality_*_spt/
+
 #20250308
 # run
 server=dcc
@@ -84,3 +86,4 @@ for pattern in $patterns; do
     echo "No directory found matching pattern: client_${server}_${pattern}_*"
   fi
 done
+
