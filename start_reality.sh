@@ -174,7 +174,7 @@ generate_x25519_keys() {
         output=$(docker exec "${CONTAINER_NAME}" xray x25519 2>&1)
         
         # 检查命令是否成功执行
-        if [ $? -eq 0 ] && echo "$output" | grep -q "Private key:"; then
+        if [ $? -eq 0 ] && echo "$output" | grep -q "PrivateKey:"; then
             break
         fi
         
@@ -191,8 +191,8 @@ generate_x25519_keys() {
     # 提取私钥和公钥
     local PRIVATEKEY
     local PUBLICKEY
-    PRIVATEKEY=$(echo "$output" | grep "Private key:" | awk -F': ' '{print $2}')
-    PUBLICKEY=$(echo "$output" | grep "Public key:" | awk -F': ' '{print $2}')
+    PRIVATEKEY=$(echo "$output" | grep "PrivateKey:" | awk -F': ' '{print $2}')
+    PUBLICKEY=$(echo "$output" | grep "Password:" | awk -F': ' '{print $2}')
 
     if [ -z "$PRIVATEKEY" ] || [ -z "$PUBLICKEY" ]; then
         log_error "生成密钥失败。输出内容: $output"
@@ -200,7 +200,7 @@ generate_x25519_keys() {
     fi
 
     # 不在日志中输出私钥
-    log_info "Public Key: $PUBLICKEY"
+    log_info "Password: $PUBLICKEY"
 
     # 设置密钥的权限并保存到 CONFIG_DIR
     echo "$PRIVATEKEY" > "${CONFIG_DIR}/private.key"

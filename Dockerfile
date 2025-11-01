@@ -1,7 +1,7 @@
 # builder
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 LABEL maintainer="your_email@example.com"
-LABEL version="1.0.0"
+LABEL version="1.1.0"
 
 WORKDIR /app
 
